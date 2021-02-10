@@ -11,18 +11,22 @@ from torch import Tensor
 
 VERBOSITY = 3
 TIMESTAMPED = False
+DATA_DIR = '/Users/wouter/Documents/OneDrive/Education/KULeuven/MAI/013_THESIS/data'
 
-# Set script parameters
-def set_params(verbosity:int = 3, timestamped:bool = False):
 
+# Set parameters
+def set_params(verbosity: int = None, timestamped: bool = None, data_dir: str = None):
     global VERBOSITY
     global TIMESTAMPED
+    global DATA_DIR
 
-    VERBOSITY = verbosity
-    TIMESTAMPED = timestamped
+    VERBOSITY = verbosity if verbosity else VERBOSITY
+    TIMESTAMPED = timestamped if timestamped else TIMESTAMPED
+    DATA_DIR = data_dir if data_dir else DATA_DIR
+
 
 # Expand on what happens to input when sent through layer
-def whatsgoingon(layer: Callable, input:Tensor):
+def whatsgoingon(layer: Callable, input: Tensor):
     """
     Processes input through layer, and prints the effect on the dimensionality
     """
@@ -43,6 +47,7 @@ def log(*message, verbosity=3, timestamped=TIMESTAMPED, sep="", title=False):
 
     :param message: message to print
     :param verbosity: importance of message: level 1 = top importance, level 3 = lowest importance
+    :param timestamped: include timestamp at start of log
     :param sep: separator
     :param title: toggle whether this is a title or not
     :return: /
@@ -64,7 +69,7 @@ def log(*message, verbosity=3, timestamped=TIMESTAMPED, sep="", title=False):
         # Print regular
         else:
             t = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-            print((str(t) +  (" - " if sep == "" else "-")) if timestamped else "", *message, sep=sep)
+            print((str(t) + (" - " if sep == "" else "-")) if timestamped else "", *message, sep=sep)
 
     return
 

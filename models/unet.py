@@ -1,5 +1,13 @@
+#     ___   _     __               __
+#    / _ | (_)___/ /  ___ ___ ____/ /
+#   / __ |/ / __/ _ \/ -_) _ `/ _  /
+#  /_/ |_/_/_/ /_//_/\__/\_,_/\_,_/
+#
+
 """
-3D U-Net implementation
+3D U-Net implementation as described in
+Isensee, F., Jaeger, P. F., Full, P. M., Vollmuth, P., & Maier-Hein, K. H. (2020).
+ nnU-Net for Brain Tumor Segmentation. 1–15. http://arxiv.org/abs/2011.00848
 
 -- Coded by Wouter Durnez
 """
@@ -10,7 +18,7 @@ from torch import cat
 from helper import *
 
 
-# Downsample block (currently max pool)
+# Downsample block (currently strided convolutions)
 class Downsample(nn.Module):
 
     def __init__(self,
@@ -41,6 +49,7 @@ class DoubleConv(nn.Module):
             in_channels,
             out_channels,
             num_groups=8,
+            strides=(2,1),
             activation=nn.LeakyReLU(inplace=True),
             conv_par=None,
             __name__='double_conv',
@@ -59,7 +68,10 @@ class DoubleConv(nn.Module):
         self.block = nn.Sequential(
 
             # Convolution layer
-            nn.Conv3d(in_channels=in_channels, out_channels=out_channels, **conv_par),
+            nn.Conv3d(in_channels=in_channels,
+                      out_channels=out_channels,
+                      stride=strides[0],
+                      **conv_par),
 
             # Normalization layer (default minibatch of 8 instances)
             nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
@@ -68,7 +80,10 @@ class DoubleConv(nn.Module):
             activation,
 
             # Convolution layer
-            nn.Conv3d(in_channels=out_channels, out_channels=out_channels, **conv_par),
+            nn.Conv3d(in_channels=out_channels,
+                      out_channels=out_channels,
+                      stride=strides[1],
+                      **conv_par),
 
             # Normalization layer (default minibatch of 8 instances)
             nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
@@ -129,6 +144,10 @@ class UNet(nn.Module):
         self.out_channels = out_channels
         self.widths = widths
 
+        ##############
+        # Parameters #
+        ##############
+
         # Set default parameters for double convolution
         conv_par = conv_par if conv_par else {}
         conv_par.setdefault('kernel_size', 3)
@@ -146,11 +165,15 @@ class UNet(nn.Module):
         up_par.setdefault('padding', 1)
         up_par.setdefault('output_padding', 1)
 
+        ################
+        # Architecture #
+        ################
+
         # ENCODER
         """
         5 segments composed of double convolution blocks, followed by pooling (downsampling)
         """
-        self.enc_1 = DoubleConv(self.in_channels, self.widths[0], activation=activation, conv_par=conv_par)
+        self.enc_1 = DoubleConv(self.in_channels, self.widths[0], strides=(1,1), activation=activation, conv_par=conv_par)
         self.down_1 = Downsample(down_par=down_par)
         self.enc_2 = DoubleConv(self.widths[0], self.widths[1], activation=activation, conv_par=conv_par)
         self.down_2 = Downsample(down_par=down_par)
@@ -169,19 +192,19 @@ class UNet(nn.Module):
         5 segments composed of transposed convolutions (upsampling) and double convolution blocks
         """
         self.up_1 = Upsample(self.widths[4], self.widths[4], up_par=up_par)
-        self.dec_1 = DoubleConv(2 * self.widths[4], self.widths[3])  # double the filters due to concatenation
+        self.dec_1 = DoubleConv(2 * self.widths[4], self.widths[3], strides=(1,1), activation=activation, conv_par=conv_par)  # double the filters due to concatenation
         self.up_2 = Upsample(self.widths[3], self.widths[3], up_par=up_par)
-        self.dec_2 = DoubleConv(2 * self.widths[3], self.widths[2])
+        self.dec_2 = DoubleConv(2 * self.widths[3], self.widths[2], strides=(1,1), activation=activation, conv_par=conv_par)
         self.up_3 = Upsample(self.widths[2], self.widths[2], up_par=up_par)
-        self.dec_3 = DoubleConv(2 * self.widths[2], self.widths[1])
+        self.dec_3 = DoubleConv(2 * self.widths[2], self.widths[1], strides=(1,1), activation=activation, conv_par=conv_par)
         self.up_4 = Upsample(self.widths[1], self.widths[1], up_par=up_par)
-        self.dec_4 = DoubleConv(2 * self.widths[1], self.widths[0])
+        self.dec_4 = DoubleConv(2 * self.widths[1], self.widths[0], strides=(1,1), activation=activation, conv_par=conv_par)
         self.up_5 = Upsample(self.widths[0], self.widths[0], up_par=up_par)
-        self.dec_5 = DoubleConv(2 * self.widths[0], self.widths[0])
+        self.dec_5 = DoubleConv(2 * self.widths[0], self.widths[0], strides=(1,1), activation=activation, conv_par=conv_par)
 
         # Output
         self.final_conv = nn.Conv3d(in_channels=self.widths[0], out_channels=out_channels, kernel_size=1)
-        self.final_act = nn.Softmax()
+        self.final_act = nn.Softmax(dim=1)
 
     # Forward propagation
     def forward(self, input):
@@ -192,21 +215,21 @@ class UNet(nn.Module):
         # Encoding
         log('ENCODER')
         enc_1 = whatsgoingon(self.enc_1, input)
-        down_1 = whatsgoingon(self.down_1, enc_1)
+        #down_1 = whatsgoingon(self.down_1, enc_1)
 
-        enc_2 = whatsgoingon(self.enc_2, down_1)
-        down_2 = whatsgoingon(self.down_2, enc_2)
+        enc_2 = whatsgoingon(self.enc_2, enc_1)
+        #down_2 = whatsgoingon(self.down_2, enc_2)
 
-        enc_3 = whatsgoingon(self.enc_3, down_2)
-        down_3 = whatsgoingon(self.down_3, enc_3)
+        enc_3 = whatsgoingon(self.enc_3, enc_2)
+        #down_3 = whatsgoingon(self.down_3, enc_3)
 
-        enc_4 = whatsgoingon(self.enc_4, down_3)
-        down_4 = whatsgoingon(self.down_4, enc_4)
+        enc_4 = whatsgoingon(self.enc_4, enc_3)
+        #down_4 = whatsgoingon(self.down_4, enc_4)
 
-        enc_5 = whatsgoingon(self.enc_5, down_4)
-        down_5 = whatsgoingon(self.down_5, enc_5)
+        enc_5 = whatsgoingon(self.enc_5, enc_4)
+        #down_5 = whatsgoingon(self.down_5, enc_5)
 
-        encoded = whatsgoingon(self.bridge, down_5)
+        encoded = whatsgoingon(self.bridge, enc_5)
 
         # Decoding
         log('DECODER')
@@ -233,13 +256,13 @@ class UNet(nn.Module):
         # Final
         log('HEAD')
         final_conv = self.final_conv(dec_5)
-        output = self.final_conv(final_conv)
+        output = self.final_act(final_conv)
 
         return output
 
 
 if __name__ == '__main__':
-    # Script parameters (mainly for console logging)
+    # Console parameters
     set_params(verbosity=3, timestamped=False)
 
     # Quick test (currently no cuda support on my end)
@@ -252,7 +275,9 @@ if __name__ == '__main__':
     log(f'Input size (single image): {x.size()}')
 
     # Initialize model
-    model = UNet(in_channels=4, out_channels=4)
+    model = UNet(in_channels=4, out_channels=1)
 
     # Process example input
     out = model(x)
+    log(f'Output size (single image): {out.size()}')
+
