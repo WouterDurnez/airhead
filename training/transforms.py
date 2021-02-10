@@ -7,7 +7,8 @@
 """
 Transforms (common image transformations) for use in training, validation, testing and visualisation
 
--- Coded by Wouter Durnez
+-- Based on code by Pooya Ashtari
+-- (Slightly) adapted (well, pretty much adopted) by Wouter Durnez
 """
 
 import numpy as np

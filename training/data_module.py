@@ -5,10 +5,11 @@
 #
 
 """
-Data handler functions
--- Coded by Wouter Durnez
+BraTS data module for use in training functions
+
+-- Based on code by Pooya Ashtari
+-- Adapted by Wouter Durnez
 """
-from abc import ABC
 from glob import glob
 from os import listdir
 from os.path import join
@@ -61,6 +62,7 @@ def get_data(root_dir, labeled=True):
     return patients
 
 
+# Data module
 class BraTSDataModule(LightningDataModule):
     """
     BraTS-specific Lightning data module, designed to encapsulate
@@ -71,7 +73,7 @@ class BraTSDataModule(LightningDataModule):
             self,
             data_dir=None,
             test_dir=None,
-            num_workers=2,
+            num_workers=0,
             batch_size=2,
             validation_size=0.2,
     ):
