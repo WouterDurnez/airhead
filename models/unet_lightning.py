@@ -139,7 +139,7 @@ class UNetLightning(LightningModule):
                 metric_value = metric_value.item()
             self.log(metric_name, metric_value, prog_bar=True)
 
-            # Log using Tensorboard logger
+            # Log using Tensorboard logger TODO: Check if this is necessary, and how this compares to self.log
             self.logger.experiment.add_scalar(f"{metric_name}/train", metric_value, self.current_epoch)
 
     # Validation step

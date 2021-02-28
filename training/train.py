@@ -118,12 +118,13 @@ if __name__ == '__main__':
     brats = BraTSDataModule(data_dir=train_dir,
                             test_dir=test_dir,
                             num_workers=0,
-                            # TODO: Increasing num_workers causes error: https://github.com/Project-MONAI/MONAI/issues/755
+                            # TODO: Increasing num_workers causes error
                             batch_size=1,
                             validation_size=.2)
+    brats.setup()
 
     # Initialize logger
-    tb_logger = TensorBoardLogger(save_dir=log_dir, name='unet_baseline')
+    tb_logger = TensorBoardLogger(save_dir=log_dir, name='unet_baseline',default_hp_metric=False,version=0)
 
     # Initialize trainer
     log("Initializing trainer")
@@ -142,4 +143,5 @@ if __name__ == '__main__':
 
     # Train
     log("Commencing training")
-    #trainer.fit(model, brats)  # TODO: checkout warning here (expected data loader, not data module)
+    trainer.fit(model=model,
+                datamodule=brats)
