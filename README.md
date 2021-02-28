@@ -1,4 +1,6 @@
-# Airhead  
+![](docs/airhead_logo.png)
+
+# Airhead 
   
 ## Lightweight Convolutional Neural Networks for Brain Tumor Segmentation  
 
