@@ -2,7 +2,7 @@
   
 ## Lightweight Convolutional Neural Networks for Brain Tumor Segmentation  
 
-This repository hosts the code for my thesis at KULeuven, in order to obtain the degree of Master in Artificial Intelligence. Initial code was provided by [Pooya Ashtari](https://www.kuleuven.be/wieiswie/nl/person/00129604).
+This repository hosts the code for my thesis at KULeuven, in order to obtain the degree of Master in Artificial Intelligence. Extensive boilerplate code was provided by my supervisor [Pooya Ashtari](https://www.kuleuven.be/wieiswie/nl/person/00129604).
 
 ### Components
 
@@ -11,7 +11,6 @@ This repository hosts the code for my thesis at KULeuven, in order to obtain the
 * Lightning wrapper for the model (adding some useful functionality).
 * Data loader (Pytorch Lightning loader)
 * Transforms for training, validation and test instances, based on [Monai](https://monai.io/).
-*
 
 
 ### TODOs  

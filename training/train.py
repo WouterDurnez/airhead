@@ -74,7 +74,8 @@ from training.utils import WarmupCosineSchedule
 if __name__ == '__main__':
 
     # Let's go
-    hi()
+    hi("Training baseline UNet")
+
     # Set data directory
     root_dir = DATA_DIR
     train_dir = join(DATA_DIR, 'MICCAI_BraTS2020_TrainingData')
@@ -114,7 +115,7 @@ if __name__ == '__main__':
     log("Initializing data module")
     brats = BraTSDataModule(data_dir=train_dir,
                             test_dir=test_dir,
-                            num_workers=0,
+                            num_workers=0, # TODO: Increasing num_workers causes error: https://github.com/Project-MONAI/MONAI/issues/755
                             batch_size=1,
                             validation_size=.2)
 
@@ -131,3 +132,7 @@ if __name__ == '__main__':
             PrintTableMetricsCallback(),
         ],
     )
+
+    # Train
+    log("Commencing training")
+    trainer.fit(model,brats) # TODO: checkout warning here (expected data loader, not data module)

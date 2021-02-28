@@ -213,39 +213,36 @@ class UNet(nn.Module):
         by concatenating layer output from encoder to input for decoder.
         """
         # Encoding
-        log('ENCODER')
         """Downsampling = strided convolutions"""
-        enc_1 = whatsgoingon(self.enc_1, input)
-        enc_2 = whatsgoingon(self.enc_2, enc_1)
-        enc_3 = whatsgoingon(self.enc_3, enc_2)
-        enc_4 = whatsgoingon(self.enc_4, enc_3)
-        enc_5 = whatsgoingon(self.enc_5, enc_4)
-        encoded = whatsgoingon(self.bridge, enc_5)
+        enc_1 = self.enc_1(input)
+        enc_2 = self.enc_2(enc_1)
+        enc_3 = self.enc_3(enc_2)
+        enc_4 = self.enc_4(enc_3)
+        enc_5 = self.enc_5(enc_4)
+        encoded = self.bridge(enc_5)
 
         # Decoding
-        log('DECODER')
-        up_1 = whatsgoingon(self.up_1, encoded)
+        up_1 = self.up_1(encoded)
         cat_1 = cat([up_1, enc_5], dim=1)
-        dec_1 = whatsgoingon(self.dec_1, cat_1)  # dec_1 has widths[3] (256)
+        dec_1 = self.dec_1(cat_1)  # dec_1 has widths[3] (256)
 
-        up_2 = whatsgoingon(self.up_2, dec_1)
+        up_2 = self.up_2(dec_1)
         cat_2 = cat([up_2, enc_4], dim=1)  # up_2 has widths[3] (256) + enc_5 has widths[4] (320) = 640
-        dec_2 = whatsgoingon(self.dec_2, cat_2)
+        dec_2 = self.dec_2(cat_2)
 
-        up_3 = whatsgoingon(self.up_3, dec_2)
+        up_3 = self.up_3(dec_2)
         cat_3 = cat([up_3, enc_3], dim=1)
-        dec_3 = whatsgoingon(self.dec_3, cat_3)
+        dec_3 = self.dec_3(cat_3)
 
-        up_4 = whatsgoingon(self.up_4, dec_3)
+        up_4 = self.up_4(dec_3)
         cat_4 = cat([up_4, enc_2], dim=1)
-        dec_4 = whatsgoingon(self.dec_4, cat_4)
+        dec_4 = self.dec_4(cat_4)
 
-        up_5 = whatsgoingon(self.up_5, dec_4)
+        up_5 = self.up_5(dec_4)
         cat_5 = cat([up_5, enc_1], dim=1)
-        dec_5 = whatsgoingon(self.dec_5, cat_5)
+        dec_5 = self.dec_5(cat_5)
 
         # Final
-        log('HEAD')
         final_conv = self.final_conv(dec_5)
         if self.head:
             output = self.final_act(final_conv)
