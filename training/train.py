@@ -13,7 +13,7 @@ from pytorch_lightning import Trainer
 from pl_bolts.callbacks import PrintTableMetricsCallback
 from pytorch_lightning.callbacks import LearningRateMonitor
 from torch import optim
-
+from pytorch_lightning.loggers import TensorBoardLogger
 from helper import DATA_DIR, hi, log
 from models.unet import UNet
 from models.unet_lightning import UNetLightning
@@ -21,6 +21,8 @@ from training.data_module import BraTSDataModule
 from training.inference import val_inference
 from training.losses import dice_loss, dice_metric, dice_et, dice_tc, dice_wt
 from training.utils import WarmupCosineSchedule
+from helper import set_dir
+from os import pardir
 
 """CONFIG = {
     "system_path": [],
@@ -72,14 +74,14 @@ from training.utils import WarmupCosineSchedule
 }"""
 
 if __name__ == '__main__':
-
     # Let's go
     hi("Training baseline UNet")
 
     # Set data directory
     root_dir = DATA_DIR
-    train_dir = join(DATA_DIR, 'MICCAI_BraTS2020_TrainingData')
-    test_dir = join(DATA_DIR, 'MICCAI_BraTS2020_ValidationData')
+    train_dir = join(root_dir, 'MICCAI_BraTS2020_TrainingData')
+    test_dir = join(root_dir, 'MICCAI_BraTS2020_ValidationData')
+    log_dir = set_dir(join(pardir, 'logs'))
 
     # Initialize model
     log("Initializing UNet model")
@@ -115,19 +117,24 @@ if __name__ == '__main__':
     log("Initializing data module")
     brats = BraTSDataModule(data_dir=train_dir,
                             test_dir=test_dir,
-                            num_workers=0, # TODO: Increasing num_workers causes error: https://github.com/Project-MONAI/MONAI/issues/755
+                            num_workers=0,
+                            # TODO: Increasing num_workers causes error: https://github.com/Project-MONAI/MONAI/issues/755
                             batch_size=1,
                             validation_size=.2)
+
+    # Initialize logger
+    tb_logger = TensorBoardLogger(save_dir=log_dir, name='unet_baseline')
 
     # Initialize trainer
     log("Initializing trainer")
     trainer = Trainer(
         max_steps=100000,
         max_epochs=200,
-        #gpus=1,
-        #num_nodes=1,
-        #distributed_backend='ddp',
-        callbacks= [
+        logger=tb_logger,
+        # gpus=1,
+        # num_nodes=1,
+        # distributed_backend='ddp',
+        callbacks=[
             LearningRateMonitor(logging_interval="step"),
             PrintTableMetricsCallback(),
         ],
@@ -135,4 +142,4 @@ if __name__ == '__main__':
 
     # Train
     log("Commencing training")
-    trainer.fit(model,brats) # TODO: checkout warning here (expected data loader, not data module)
+    #trainer.fit(model, brats)  # TODO: checkout warning here (expected data loader, not data module)

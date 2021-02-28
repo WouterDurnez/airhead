@@ -120,6 +120,28 @@ class UNetLightning(LightningModule):
         self.log(f"train_{self.loss.__name__}", loss, prog_bar=True)
         return loss
 
+    # Training epoch end
+    def training_epoch_end(self, outputs):
+
+        # Metrics we'll log
+        metric_names = dict.fromkeys(outputs[0])
+
+        # Loop over metrics
+        for metric_name in metric_names:
+
+            # Average metric over outputs within epoch
+            metric_total = 0.0
+            for output in outputs:
+                metric_total += output[metric_name]
+            metric_value = metric_total / len(outputs)
+
+            if hasattr(metric_value, "item"):
+                metric_value = metric_value.item()
+            self.log(metric_name, metric_value, prog_bar=True)
+
+            # Log using Tensorboard logger
+            self.logger.experiment.add_scalar(f"{metric_name}/train", metric_value, self.current_epoch)
+
     # Validation step
     def validation_step(self, batch, batch_idx):
 
@@ -127,32 +149,48 @@ class UNetLightning(LightningModule):
         x, y = batch["input"], batch["target"]
 
         y_hat = self.inference(x, self, **self.inference_params)
-        # calculate metrics
+
+        # Calculate metrics
         output = {}
         for m, pars in zip(self.metrics, self.metrics_params):
             output[f"val_{m.__name__}"] = m(y_hat, y, **pars)
         return output
 
+    # Validation epoch end
     def validation_epoch_end(self, outputs):
+
+        # Metrics we'll log
         metric_names = dict.fromkeys(outputs[0])
+
+        # Loop over metrics
         for metric_name in metric_names:
+
+            # Average metric over outputs within epoch
             metric_total = 0.0
             for output in outputs:
                 metric_total += output[metric_name]
             metric_value = metric_total / len(outputs)
+
             if hasattr(metric_value, "item"):
                 metric_value = metric_value.item()
             self.log(metric_name, metric_value, prog_bar=True)
 
+            # Log using Tensorboard logger
+            self.logger.experiment.add_scalar(f"{metric_name}/val",metric_value,self.current_epoch)
+
+    # Test step
     def test_step(self, batch, batch_idx):
+
+        # Get new input and predict, then calculate loss
         x, y = batch["input"], batch["target"]
-        # inference
         y_hat = self.inference(x, self, **self.inference_params)
-        # calculate metrics
+
+        # Calculate metrics
         output = {}
         for m, pars in zip(self.metrics, self.metrics_params):
             output[f"test_{m.__name__}"] = m(y_hat, y, **pars)
         return output
 
+    # Test epoch end
     def test_epoch_end(self, outputs):
         self.validation_epoch_end(outputs)
