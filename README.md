@@ -1,7 +1,5 @@
 ![](docs/airhead_logo.png)
-
-# Airhead 
-  
+ 
 ## Lightweight Convolutional Neural Networks for Brain Tumor Segmentation  
 
 This repository hosts the code for my thesis at KULeuven, in order to obtain the degree of Master in Artificial Intelligence. Extensive boilerplate code was provided by my supervisor [Pooya Ashtari](https://www.kuleuven.be/wieiswie/nl/person/00129604).
@@ -18,8 +16,7 @@ This repository hosts the code for my thesis at KULeuven, in order to obtain the
 ### TODOs  
   
 * Add **operational training script**  
-	 * Include **config file**  
-  * Include 'run' script, which takes config file and initiate training  
+  * (maybe) move parameters to dict-style **config file**  
   * (maybe) include **terminal-based** run-script (see example by Pooya)  
   * Sort out final activation: model can be initiated with or without Softmax activation, but additional posttransform is needed in the latter case  
 * Add **TensorBoard** support  
