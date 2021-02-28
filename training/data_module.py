@@ -6,9 +6,6 @@
 
 """
 BraTS data module for use in training functions
-
--- Based on code by Pooya Ashtari
--- Adapted by Wouter Durnez
 """
 from glob import glob
 from os import listdir

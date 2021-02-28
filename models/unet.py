@@ -8,8 +8,6 @@
 3D U-Net implementation as described in
 Isensee, F., Jaeger, P. F., Full, P. M., Vollmuth, P., & Maier-Hein, K. H. (2020).
  nnU-Net for Brain Tumor Segmentation. 1–15. http://arxiv.org/abs/2011.00848
-
--- Coded by Wouter Durnez
 """
 
 import torch
@@ -135,7 +133,8 @@ class UNet(nn.Module):
             activation=nn.LeakyReLU(inplace=True),
             conv_par=None,
             down_par=None,
-            up_par=None
+            up_par=None,
+            head=True
     ):
         super().__init__()
 
@@ -143,6 +142,7 @@ class UNet(nn.Module):
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.widths = widths
+        self.head = head
 
         ##############
         # Parameters #
@@ -214,21 +214,12 @@ class UNet(nn.Module):
         """
         # Encoding
         log('ENCODER')
+        """Downsampling = strided convolutions"""
         enc_1 = whatsgoingon(self.enc_1, input)
-        #down_1 = whatsgoingon(self.down_1, enc_1)
-
         enc_2 = whatsgoingon(self.enc_2, enc_1)
-        #down_2 = whatsgoingon(self.down_2, enc_2)
-
         enc_3 = whatsgoingon(self.enc_3, enc_2)
-        #down_3 = whatsgoingon(self.down_3, enc_3)
-
         enc_4 = whatsgoingon(self.enc_4, enc_3)
-        #down_4 = whatsgoingon(self.down_4, enc_4)
-
         enc_5 = whatsgoingon(self.enc_5, enc_4)
-        #down_5 = whatsgoingon(self.down_5, enc_5)
-
         encoded = whatsgoingon(self.bridge, enc_5)
 
         # Decoding
@@ -256,7 +247,10 @@ class UNet(nn.Module):
         # Final
         log('HEAD')
         final_conv = self.final_conv(dec_5)
-        output = self.final_act(final_conv)
+        if self.head:
+            output = self.final_act(final_conv)
+        else:
+            output=final_conv
 
         return output
 
@@ -275,7 +269,7 @@ if __name__ == '__main__':
     log(f'Input size (single image): {x.size()}')
 
     # Initialize model
-    model = UNet(in_channels=4, out_channels=1)
+    model = UNet(in_channels=4, out_channels=3, head=False)
 
     # Process example input
     out = model(x)

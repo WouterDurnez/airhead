@@ -7,9 +7,6 @@
 """
 Inference functions
 i.e. pass (unseen) input through the model and see what it says
-
--- Based on code by Pooya Ashtari
--- Adapted by Wouter Durnez
 """
 from monai.transforms import Compose
 from monai.transforms import Activations, AsDiscrete
@@ -39,14 +36,17 @@ def val_inference(input: torch.Tensor, model: nn.Module):
     # Post transforms
     # * Sigmoid activation layer TODO: check if this is necessary (switched off for now)
     # * Threshold the values to 0 or 1
-    post_trans = Compose(
-        [
-            #Activations(sigmoid=True),
-            AsDiscrete(threshold_values=True)
-        ]
-    )
 
-    # Apply post transforms
+    post_trans_list = [AsDiscrete(threshold_values=True)]
+
+    # If it's the right type of model, containing our 'head' parameter,
+    # check if the head is there, otherwise add Softmax as posttransform
+    if hasattr(model,'head'):
+        if not model.head:
+            post_trans_list.insert(0, Activations(sigmoid=True))
+
+    # Compose and apply
+    post_trans = Compose(post_trans_list)
     output = post_trans(output)
 
     return output

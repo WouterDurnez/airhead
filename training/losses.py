@@ -6,9 +6,6 @@
 
 """
 Loss functions
-
--- Based on code by Pooya Ashtari
--- Adapted by Wouter Durnez
 """
 
 from monai.losses import DiceLoss

@@ -1,13 +1,12 @@
 """
 Helper functions
-
--- Coded by Wouter Durnez
 """
 
 from typing import Callable
 import time
 import os, sys
 from torch import Tensor
+from pytorch_lightning import seed_everything
 
 VERBOSITY = 3
 TIMESTAMPED = False
@@ -23,6 +22,35 @@ def set_params(verbosity: int = None, timestamped: bool = None, data_dir: str = 
     VERBOSITY = verbosity if verbosity else VERBOSITY
     TIMESTAMPED = timestamped if timestamped else TIMESTAMPED
     DATA_DIR = data_dir if data_dir else DATA_DIR
+
+    if data_dir:
+        log("DATA_DIR is now set to {}".format(DATA_DIR), verbosity=1)
+    if verbosity:
+        log("VERBOSITY is set to {}".format(TIMESTAMPED),verbosity=1)
+
+
+def hi(title=None):
+    """
+    Say hello. (It's stupid, I know.)
+    If there's anything to initialize, do so here.
+    """
+
+    print("\n")
+    print("     ___   _     __               __")
+    print("    / _ | (_)___/ /  ___ ___ ____/ /")
+    print("   / __ |/ / __/ _ \/ -_) _ `/ _  /")
+    print("  /_/ |_/_/_/ /_//_/\__/\_,_/\_,_/")
+    print()
+
+    if title:
+        log(title, title=True)
+
+    print("VERBOSITY is set to {}.".format(VERBOSITY))
+    print("DATA_DIR is set to {}".format(DATA_DIR))
+    print()
+
+    # Set seed
+    seed_everything(616)
 
 
 # Expand on what happens to input when sent through layer
@@ -40,7 +68,7 @@ def whatsgoingon(layer: Callable, input: Tensor):
     return output
 
 
-# Fancy print function
+# Fancy print
 def log(*message, verbosity=3, timestamped=TIMESTAMPED, sep="", title=False):
     """
     Print wrapper that adds timestamp, and can be used to toggle levels of logging info.

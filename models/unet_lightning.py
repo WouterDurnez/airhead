@@ -6,55 +6,62 @@
 
 """
 Lightning wrapper for model, to facilitate easy training
-
--- Based on code by Pooya Ashtari
--- Adapted by Wouter Durnez
 """
 
 import torch.nn.functional as F
 from torch import nn
 from torch import optim
 from pytorch_lightning.core import LightningModule
-from losses import dice_loss, dice_metric, dice_et, dice_tc, dice_wt
-from models.unet import UNet
 
-class Model(LightningModule):
+
+####################################
+# Lightning wrapper for UNet model #
+####################################
+
+class UNetLightning(LightningModule):
     def __init__(
         self,
-        network=UNet,
+        network,
         network_params=None,
-        loss=dice_loss,
-        metrics=(dice_metric, dice_et, dice_tc, dice_wt,),
-        optimizer=optim.AdamW, # TODO: Why AdamW?
+        loss=F.cross_entropy,
+        loss_params=None,
+        metrics=(F.cross_entropy,),
+        metrics_params=None,
+        optimizer=optim.SGD,
+        optimizer_params=None,
         scheduler=optim.lr_scheduler.ReduceLROnPlateau,
         scheduler_params=None,
         scheduler_config=None,
         inference=nn.Identity,
         inference_params=None,
+        **kwargs,
     ):
-        super().__init__()
+        super().__init__(**kwargs)
 
-        # Create network
-        self.network_params = {
-            'in_channels': 4,
-            'out_channels': 3
+        # Network parameters
+        self.network_params = {} if network_params is None else network_params
 
-        } if network_params is None else network_params
+        # Initialize network
         self.net = network(**self.network_params)
 
-        # Loss function
+        # Set loss
         self.loss = loss
+        self.loss_params = {} if loss_params is None else loss_params
 
-        # Performance metrics
+        # Set metrics
         self.metrics = metrics
+        n_metrics = len(self.metrics)
+        self.metrics_params = (
+            [{}] * n_metrics if metrics_params is None else metrics_params
+        )
 
-        # Optimizer
+        # Set optimizer
         self.optimizer = optimizer
-        self.optimizer_params = {
-            'lr': 1e-4,
-            'weight_decay': 1e-2}
+        self.optimizer_params = (
+            {} if optimizer_params is None else optimizer_params
+        )
 
-        # Learning rate scheduler   # TODO: Figure this out
+        # Set learning rate scheduler
         if scheduler is not None:
             self.scheduler = scheduler
             self.scheduler_params = (
@@ -64,21 +71,24 @@ class Model(LightningModule):
                 {} if scheduler_config is None else scheduler_config
             )
 
-        # inference
+        # Set inference method
         self.inference = inference
         self.inference_params = (
             {} if inference_params is None else inference_params
         )
 
-        # save hyperparameters
+        # Save hyperparameters
         self.save_hyperparameters()
 
+    # Get total number of learnable weights
     def get_n_parameters(self):
         return sum(p.numel() for p in self.net.parameters() if p.requires_grad)
 
+    # Feedforward
     def forward(self, x):
         return self.net(x)
 
+    # Configure optimization and LR schedule
     def configure_optimizers(self):
         optimizer = self.optimizer(
             self.net.parameters(), **self.optimizer_params
@@ -94,19 +104,28 @@ class Model(LightningModule):
 
         return config
 
+    ############
+    # Training #
+    ############
+
+    # Training step
     def training_step(self, batch, batch_idx):
+
+        # Get new input and predict, then calculate loss
         x, y = batch["input"], batch["target"]
-        # forward
         y_hat = self(x)
-        # calculate loss
         loss = self.loss(y_hat, y, **self.loss_params)
-        # add logging and calculate metrics
+
+        # Log output and calculate metrics
         self.log(f"train_{self.loss.__name__}", loss, prog_bar=True)
         return loss
 
+    # Validation step
     def validation_step(self, batch, batch_idx):
+
+        # Get new input and predict, then calculate loss
         x, y = batch["input"], batch["target"]
-        # inference
+
         y_hat = self.inference(x, self, **self.inference_params)
         # calculate metrics
         output = {}
