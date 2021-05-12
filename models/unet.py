@@ -13,7 +13,7 @@ Isensee, F., Jaeger, P. F., Full, P. M., Vollmuth, P., & Maier-Hein, K. H. (2020
 import torch
 import torch.nn as nn
 from torch import cat
-from helper import *
+from utils.helper import *
 
 
 # Downsample block (currently strided convolutions)

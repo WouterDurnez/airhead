@@ -10,7 +10,7 @@ from pytorch_lightning import seed_everything
 
 VERBOSITY = 3
 TIMESTAMPED = False
-DATA_DIR = '/Users/wouter/Documents/OneDrive/Education/KULeuven/MAI/013_THESIS/data'
+DATA_DIR = '/home/wouter/Documents/MAI/airhead/airhead/data'
 
 
 # Set parameters

@@ -7,3 +7,7 @@ SimpleITK
 Nibabel
 Pillow
 ITK
+wandb
+torchvision
+matplotlib
+gym

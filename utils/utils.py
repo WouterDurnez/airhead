@@ -14,7 +14,7 @@ import math
 
 from torch.optim.lr_scheduler import LambdaLR
 from pytorch_lightning.callbacks import Callback
-from helper import log
+from utils.helper import log
 
 #################
 # LR Schedulers #

@@ -12,8 +12,6 @@ from monai.transforms import Compose
 from monai.transforms import Activations, AsDiscrete
 from monai.inferers import sliding_window_inference
 import torch
-import os
-import SimpleITK as sitk
 import torch.nn as nn
 
 
@@ -80,53 +78,4 @@ def test_inference(input: torch.Tensor, model: nn.Module):
     output = post_trans(output)
     return output
 
-# TODO: process (understand, adapt) functions below
-
-def inference_write(
-        model,
-        datamodule,
-        checkpoint_path,
-        test_dir,
-        write_dir=os.getcwd(),
-        device=None,
-):
-    if device is None:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # set datamodule
-    datamodule.setup("test")
-    test_dl = datamodule.test_dataloader
-
-    # load model
-    model = model.load_from_checkpoint(checkpoint_path)
-    model.to(device)
-
-    # predict and write
-    model.eval()
-    with torch.no_grad():
-        for sample in test_dl:
-            predict_single(model, sample, write_dir, device)
-
-
-def predict_single(model, sample, write_dir, device):
-    """Predict and write mask for a single image."""
-
-    # get sample
-    id_ = sample["id"]
-    x = sample["input"].to(device)
-
-    # get path
-    path = os.path.join(write_dir, f"{id_}.nii.gz")
-
-    if not os.path.isfile(path):
-        # predict
-        pred = test_inference(x, model)
-
-        # write image as nii.gz
-        pred = pred[0].astype("uint8").numpy()
-        pred = sitk.GetImageFromArray(pred)
-        sitk.WriteImage(pred, path)
-
-        print(f"Subject {id_} done.")
-    return None
 

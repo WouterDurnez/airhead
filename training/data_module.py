@@ -15,8 +15,8 @@ from monai.data import Dataset, DataLoader
 from pytorch_lightning import LightningDataModule
 from sklearn.model_selection import train_test_split
 
-from helper import *
-from transforms import *
+from utils.helper import *
+from training.transforms import *
 
 
 # Get dict mapping subjects with data paths

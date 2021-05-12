@@ -15,15 +15,15 @@ from pytorch_lightning.callbacks import LearningRateMonitor
 from torch import optim
 from pytorch_lightning.loggers import TensorBoardLogger
 
-import helper as hlp
-from helper import log
+from utils import helper as hlp
+from utils.helper import log
 from models.unet import UNet
 from models.unet_lightning import UNetLightning
 from training.data_module import BraTSDataModule
 from training.inference import val_inference
 from training.losses import dice_loss, dice_metric, dice_et, dice_tc, dice_wt
-from training.utils import WarmupCosineSchedule
-from helper import set_dir
+from utils.utils import WarmupCosineSchedule
+from utils.helper import set_dir
 from os import pardir
 
 """CONFIG = {
@@ -77,7 +77,7 @@ from os import pardir
 
 if __name__ == '__main__':
     # Let's go
-    hlp.set_params(data_dir='../../data')
+    hlp.set_params(data_dir='../data')
     hlp.hi("Training baseline UNet")
 
     # Set data directory
