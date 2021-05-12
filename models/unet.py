@@ -204,7 +204,8 @@ class UNet(nn.Module):
 
         # Output
         self.final_conv = nn.Conv3d(in_channels=self.widths[0], out_channels=out_channels, kernel_size=1)
-        self.final_act = nn.Softmax(dim=1)
+        if self.head:
+            self.final_act = nn.Softmax(dim=1)
 
     # Forward propagation
     def forward(self, input):
@@ -266,9 +267,11 @@ if __name__ == '__main__':
     log(f'Input size (single image): {x.size()}')
 
     # Initialize model
-    model = UNet(in_channels=4, out_channels=3, head=False)
+    model = UNet(in_channels=4, out_channels=3, head=True)
+    model2 = UNet(in_channels=4, out_channels=3, head=False)
 
     # Process example input
     out = model(x)
+    out2 = model2(x)
     log(f'Output size (single image): {out.size()}')
 

@@ -14,7 +14,9 @@ from pl_bolts.callbacks import PrintTableMetricsCallback
 from pytorch_lightning.callbacks import LearningRateMonitor
 from torch import optim
 from pytorch_lightning.loggers import TensorBoardLogger
-from helper import DATA_DIR, hi, log
+
+import helper as hlp
+from helper import log
 from models.unet import UNet
 from models.unet_lightning import UNetLightning
 from training.data_module import BraTSDataModule
@@ -75,12 +77,12 @@ from os import pardir
 
 if __name__ == '__main__':
     # Let's go
-    hi("Training baseline UNet")
+    hlp.set_params(data_dir='../../data')
+    hlp.hi("Training baseline UNet")
 
     # Set data directory
-    root_dir = DATA_DIR
-    train_dir = join(root_dir, 'MICCAI_BraTS2020_TrainingData')
-    test_dir = join(root_dir, 'MICCAI_BraTS2020_ValidationData')
+    train_dir = join(hlp.DATA_DIR, 'MICCAI_BraTS2020_TrainingData')
+    test_dir = join(hlp.DATA_DIR, 'MICCAI_BraTS2020_ValidationData')
     log_dir = set_dir(join(pardir, 'logs'))
 
     # Initialize model
@@ -117,7 +119,7 @@ if __name__ == '__main__':
     log("Initializing data module")
     brats = BraTSDataModule(data_dir=train_dir,
                             test_dir=test_dir,
-                            num_workers=0,
+                            num_workers=4,
                             # TODO: Increasing num_workers causes error
                             batch_size=1,
                             validation_size=.2)
@@ -132,7 +134,7 @@ if __name__ == '__main__':
         max_steps=100000,
         max_epochs=200,
         logger=tb_logger,
-        # gpus=1,
+        gpus=1,
         # num_nodes=1,
         # distributed_backend='ddp',
         callbacks=[

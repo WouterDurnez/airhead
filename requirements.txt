@@ -1,0 +1,9 @@
+torch
+pytorch-lightning
+monai
+sklearn
+scipy
+SimpleITK
+Nibabel
+Pillow
+ITK
