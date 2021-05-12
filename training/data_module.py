@@ -71,7 +71,7 @@ class BraTSDataModule(LightningDataModule):
             data_dir=None,
             test_dir=None,
             num_workers=0,
-            batch_size=2,
+            batch_size=1,
             validation_size=0.2,
     ):
         super().__init__()
