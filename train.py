@@ -20,8 +20,8 @@ from utils.helper import log
 from models.unet import UNet
 from models.unet_lightning import UNetLightning
 from training.data_module import BraTSDataModule
-from training.inference import val_inference
-from training.losses import dice_loss, dice_metric, dice_et, dice_tc, dice_wt
+from training.inference import val_inference, test_inference
+from training.losses import dice_loss, dice_metric, dice_et, dice_tc, dice_wt, hd_metric, hd_et, hd_tc, hd_wt
 from utils.utils import WarmupCosineSchedule, TakeSnapshot
 from utils.helper import set_dir
 from os import pardir
@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
     # Name
     model_name = 'unet_baseline'
-    version = 0
+    version = 1
 
     # Set data directory
     train_dir = join(hlp.DATA_DIR, 'MICCAI_BraTS2020_TrainingData')
@@ -102,7 +102,8 @@ if __name__ == '__main__':
 
         # Loss and metrics
         loss=dice_loss,
-        metrics=[dice_metric, dice_et, dice_tc, dice_wt],
+        metrics=[dice_metric, dice_et, dice_tc, dice_wt,
+                 hd_metric, hd_et, hd_tc, hd_wt],
 
         # Optimizer
         optimizer=optim.AdamW,  # TODO: Why AdamW?
@@ -115,12 +116,16 @@ if __name__ == '__main__':
 
         # Inference method
         inference=val_inference,
-        inference_params=None
+        inference_params=None,
+
+        # Test inference method
+        test_inference=test_inference,
+        test_inference_params=None,
     )
 
     # Load checkpoint
-    print('Checkpoint path:', join(snap_dir,'epoch=49.ckpt'))
-    model.load_from_checkpoint(checkpoint_path=join(snap_dir,'epoch=49.ckpt'))
+    '''print('Checkpoint path:', join(snap_dir,'epoch=49.ckpt'))
+    model.load_from_checkpoint(checkpoint_path=join(snap_dir,'epoch=49.ckpt'))'''
 
     # Initialize data module
     log("Initializing data module")
@@ -138,7 +143,7 @@ if __name__ == '__main__':
     log("Initializing trainer")
     trainer = Trainer(
         max_steps=100000,
-        max_epochs=50,
+        max_epochs=1,
         logger=tb_logger,
         gpus=1,
         num_nodes=1,
@@ -152,8 +157,8 @@ if __name__ == '__main__':
 
     # Train
     log("Commencing training")
-    #trainer.fit(model=model,
-    #            datamodule=brats)
+    trainer.fit(model=model,
+                datamodule=brats)
 
     # Additional checkpoint (just in case)
     trainer.save_checkpoint(join(snap_dir, f'final_{model_name}_v{version}.ckpt'))

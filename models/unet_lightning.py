@@ -203,7 +203,7 @@ class UNetLightning(LightningModule):
 
         # Infer and time inference
         start = time()
-        y_hat = self.inference(x, self, **self.inference_params)
+        y_hat = self.test_inference(x, self, **self.test_inference_params)
         end = time()
 
         # Calculate metrics

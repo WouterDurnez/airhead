@@ -32,13 +32,13 @@ def val_inference(input: torch.Tensor, model: nn.Module):
     output = model(input)
 
     # Post transforms
-    # * Sigmoid activation layer TODO: check if this is necessary (switched off for now)
+    # * Sigmoid activation layer (if needed)
     # * Threshold the values to 0 or 1
 
     post_trans_list = [AsDiscrete(threshold_values=True)]
 
     # If it's the right type of model, containing our 'head' parameter,
-    # check if the head is there, otherwise add Softmax as posttransform
+    # check if the head is there, otherwise add sigmoid as posttransform
     if hasattr(model,'head'):
         if not model.head:
             post_trans_list.insert(0, Activations(sigmoid=True))
@@ -59,23 +59,27 @@ def test_inference(input: torch.Tensor, model: nn.Module):
     :return: model output (segmentation)
     """
 
-    # Generate output using sliding window (sized 128^3) TODO: why is this necessary? test data are resized by transforms?
+    # Generate output using sliding window (sized 128^3)
     output = sliding_window_inference(
-        inputs=input, roi_size=(128, 128, 128), sw_batch_size=4, predictor=model,
+        inputs=input, roi_size=(128, 128, 128), sw_batch_size=2, predictor=model,
     )
 
     # Post transforms
-    # * Sigmoid activation layer TODO: check if this is necessary (switched off for now)
+    # * Sigmoid activation layer (if needed))
     # * Threshold the values to 0 or 1
-    post_trans = Compose(
-        [
-            Activations(sigmoid=True),
-            AsDiscrete(threshold_values=True)
-        ]
-    )
 
-    # Apply post transforms
+    post_trans_list = [AsDiscrete(threshold_values=True)]
+
+    # If it's the right type of model, containing our 'head' parameter,
+    # check if the head is there, otherwise add sigmoid as posttransform
+    if hasattr(model,'head'):
+        if not model.head:
+            post_trans_list.insert(0, Activations(sigmoid=True))
+
+    # Compose and apply
+    post_trans = Compose(post_trans_list)
     output = post_trans(output)
+
     return output
 
 
