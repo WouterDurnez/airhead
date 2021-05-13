@@ -35,6 +35,8 @@ class UNetLightning(LightningModule):
         scheduler_config=None,
         inference=nn.Identity,
         inference_params=None,
+            test_inference=None,
+            test_inference_params=None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -72,10 +74,14 @@ class UNetLightning(LightningModule):
                 {} if scheduler_config is None else scheduler_config
             )
 
-        # Set inference method
+        # Set inference methods
         self.inference = inference
         self.inference_params = (
             {} if inference_params is None else inference_params
+        )
+        self.test_inference = test_inference
+        self.test_inference_params = (
+            {} if test_inference_params is None else test_inference_params
         )
 
         # Save hyperparameters
