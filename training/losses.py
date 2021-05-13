@@ -76,7 +76,7 @@ def dice_wt(pred, true):
 # Hausdorff #
 #############
 
-metric_hd = HausdorffDistanceMetric(include_background=True, reduction='mean')
+metric_hd = HausdorffDistanceMetric(include_background=True, reduction='mean', percentile=95)
 
 
 def hd_metric(pred, true):
