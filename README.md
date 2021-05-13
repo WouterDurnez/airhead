@@ -9,7 +9,7 @@ This repository hosts the code for my thesis at KULeuven, in order to obtain the
 * A module with helper functions (i.e. timestamped logging, setting global parameters, time functions, etc.).
 * A specific instance of the **U-Net model**, based on Isensee, F., Jaeger, P. F., Full, P. M., Vollmuth, P., & Maier-Hein, K. H. (2020). _nnU-Net for Brain Tumor Segmentation_. 1–15. http://arxiv.org/abs/2011.00848. The model is not designed to be *overly* modular, but there is a set of parameters that can be freely selected, such as the number of filters in each level of the hierarchy, and whether to include the final activation layer (or train with logits).
 * Lightning wrapper for the model (adding some useful functionality).
-* Data loader (Pytorch Lightning loader)
+* Data module (Pytorch Lightning)
 * Transforms for training, validation and test instances, based on [Monai](https://monai.io/).
 
 
@@ -19,5 +19,5 @@ This repository hosts the code for my thesis at KULeuven, in order to obtain the
   * (maybe) move parameters to dict-style **config file**  
   * (maybe) include **terminal-based** run-script (see example by Pooya)  
   * Sort out final activation: model can be initiated with or without Softmax activation, but additional posttransform is needed in the latter case  
-* Add **TensorBoard** support  
-* Take care of local CUDA support (will work fine in colab)
+* Fix test inference
+* Sort out logging progress bar (it works, but it's not what I want)

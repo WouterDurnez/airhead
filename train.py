@@ -85,7 +85,6 @@ if __name__ == '__main__':
 
     # Set data directory
     train_dir = join(hlp.DATA_DIR, 'MICCAI_BraTS2020_TrainingData')
-    test_dir = join(hlp.DATA_DIR, 'MICCAI_BraTS2020_ValidationData')
     tb_dir = join(hlp.LOG_DIR, 'tb_logs', model_name)
     snap_dir = join(hlp.LOG_DIR, 'snapshots', model_name, f'version_{version}')
 
@@ -119,10 +118,13 @@ if __name__ == '__main__':
         inference_params=None
     )
 
+    # Load checkpoint
+    print('Checkpoint path:', join(snap_dir,'epoch=49.ckpt'))
+    model.load_from_checkpoint(checkpoint_path=join(snap_dir,'epoch=49.ckpt'))
+
     # Initialize data module
     log("Initializing data module")
     brats = BraTSDataModule(data_dir=train_dir,
-                            test_dir=test_dir,
                             num_workers=4,
                             # TODO: Increasing num_workers causes error
                             batch_size=1,
@@ -150,8 +152,11 @@ if __name__ == '__main__':
 
     # Train
     log("Commencing training")
-    trainer.fit(model=model,
-                datamodule=brats)
+    #trainer.fit(model=model,
+    #            datamodule=brats)
+
+    # Additional checkpoint (just in case)
+    trainer.save_checkpoint(join(snap_dir, f'final_{model_name}_v{version}.ckpt'))
 
     # Test
     log("Evaluating model")

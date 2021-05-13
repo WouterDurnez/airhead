@@ -12,6 +12,7 @@ import torch.nn.functional as F
 from torch import nn
 from torch import optim
 from pytorch_lightning.core import LightningModule
+from time import time
 
 
 ####################################
@@ -182,13 +183,39 @@ class UNetLightning(LightningModule):
     def test_step(self, batch, batch_idx):
 
         # Get new input and predict, then calculate loss
-        x, y = batch["input"], batch["target"]
+        """x, y = batch["input"], batch["target"]
         y_hat = self.inference(x, self, **self.inference_params)
 
         # Calculate metrics
         output = {}
         for m, pars in zip(self.metrics, self.metrics_params):
             output[f"test_{m.__name__}"] = m(y_hat, y, **pars)
+        return output"""
+
+        # Get new input and predict, then calculate loss
+        x, y, id_ = batch["input"], batch["target"], batch["id"]
+
+        # Infer and time inference
+        start = time()
+        y_hat = self.inference(x, self, **self.inference_params)
+        end = time()
+
+        # Calculate metrics
+        id_ = id_[0] if len(id_) == 1 else tuple(id_)
+
+        # Output dict with duration of inference
+        output = {"id": id_, "time": end - start}
+
+        # Add other metrics to output dict
+        for m, pars in zip(self.metrics, self.metrics_params):
+
+            metric_value = m(y_hat, y, **pars)
+
+            if hasattr(metric_value, "item"):
+                metric_value = metric_value.item()
+
+            output[f"test_{m.__name__}"] = metric_value
+
         return output
 
     # Test epoch end
