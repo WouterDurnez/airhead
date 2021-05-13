@@ -41,7 +41,7 @@ def val_inference(input: torch.Tensor, model: nn.Module):
     # check if the head is there, otherwise add Softmax as posttransform
     if hasattr(model,'head'):
         if not model.head:
-            post_trans_list.insert(0, Activations(softmax=True))
+            post_trans_list.insert(0, Activations(sigmoid=True))
 
     # Compose and apply
     post_trans = Compose(post_trans_list)
@@ -69,7 +69,7 @@ def test_inference(input: torch.Tensor, model: nn.Module):
     # * Threshold the values to 0 or 1
     post_trans = Compose(
         [
-            Activations(softmax=True),
+            Activations(sigmoid=True),
             AsDiscrete(threshold_values=True)
         ]
     )

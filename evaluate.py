@@ -114,6 +114,9 @@ if __name__ == '__main__':
         inference=val_inference,
         inference_params=None
     )
+    check_path = '/home/wouter/Documents/MAI/airhead/airhead/airhead/logs/unet_baseline/version_0/checkpoints/epoch=199-step=58999.ckpt'
+    unet.load_from_checkpoint(checkpoint_path=check_path)
+
     unet = unet.to(device)
 
     # Initialize data module

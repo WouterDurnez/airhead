@@ -14,9 +14,15 @@ from monai.metrics import DiceMetric
 loss = DiceLoss(to_onehot_y=False, sigmoid=True, squared_pred=True)
 metric = DiceMetric(include_background=True, reduction="mean")
 
+# Soft dice loss: add 1 to numerator and denominator to avoid 0
+soft_loss = DiceLoss(to_onehot_y=False, sigmoid=True, squared_pred=True, smooth_dr=1, smooth_nr=1)
 
 def dice_loss(pred, true):
     return loss(pred, true)
+
+
+def soft_dice_loss(pred,true):
+    return soft_loss(pred,true)
 
 
 def dice_metric(pred, true):

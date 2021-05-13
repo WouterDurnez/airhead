@@ -39,7 +39,7 @@ class OneHotEncoder(MapTransform):
     class 2: NCR+NET (label 1) --  necrotic and non-enhancing tumor core (label 3 eliminated since 2017)
     class 3: ED (label 2) -- edema
 
-    If nested:
+    If nested (DEFAULT!):
 
     class 1: ET (label 4) -- enhancing tumor
     class 2: TC (label 4 + 1) -- tumor core = enhancing + non-enhancing + necrotic
@@ -199,7 +199,7 @@ def get_vis_transform():
     """
     DATA PREPARATION
     * read data
-    * apply one-hot-encoding
+    * add target channel
     * crop the foreground (i.e. crop brain out of volume)
     * convert to tensor
     """

@@ -10,24 +10,31 @@ from pytorch_lightning import seed_everything
 
 VERBOSITY = 3
 TIMESTAMPED = False
-DATA_DIR = '/home/wouter/Documents/MAI/airhead/airhead/data'
+DATA_DIR = '../data'
+LOG_DIR = '../logs'
 
 
 # Set parameters
-def set_params(verbosity: int = None, timestamped: bool = None, data_dir: str = None):
+def set_params(verbosity: int = None, timestamped: bool = None, data_dir: str = None, log_dir: str = None):
+
     global VERBOSITY
     global TIMESTAMPED
     global DATA_DIR
+    global LOG_DIR
+
+    set_dir(DATA_DIR, LOG_DIR)
 
     VERBOSITY = verbosity if verbosity else VERBOSITY
     TIMESTAMPED = timestamped if timestamped else TIMESTAMPED
     DATA_DIR = data_dir if data_dir else DATA_DIR
+    LOG_DIR = log_dir if log_dir else LOG_DIR
 
     if data_dir:
         log("DATA_DIR is now set to {}".format(DATA_DIR), verbosity=1)
     if verbosity:
         log("VERBOSITY is set to {}".format(TIMESTAMPED),verbosity=1)
-
+    if log_dir:
+        log("LOG_DIR is set to {}".format(LOG_DIR),verbosity=1)
 
 def hi(title=None):
     """

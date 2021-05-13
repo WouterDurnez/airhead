@@ -16,8 +16,8 @@ from torch import cat
 from utils.helper import *
 
 
-# Downsample block (currently strided convolutions)
-class Downsample(nn.Module):
+# Downsample block
+class DownsampleMax(nn.Module):
 
     def __init__(self,
                  down_par=None):
@@ -32,6 +32,31 @@ class Downsample(nn.Module):
 
         self.block = nn.Sequential(
             nn.MaxPool3d(**down_par)
+        )
+
+    # Forward propagation
+    def forward(self, input):
+        return (self.block(input))
+
+# Downsample using strided convolutions
+class DownsampleStrided(nn.Module):
+
+    def __init__(self,
+                 channels,
+                 down_par=None):
+        super().__init__()
+        self.__name__ = 'strided_conv'
+
+        # Initialize parameters if not given
+        down_par = down_par if down_par else {}
+        down_par.setdefault('kernel_size', 1)
+        down_par.setdefault('stride', 2)
+        down_par.setdefault('padding', 0)
+
+        self.block = nn.Sequential(
+            nn.Conv3d(in_channels=channels,
+                      out_channels=channels,
+                      **down_par)
         )
 
     # Forward propagation
@@ -132,6 +157,7 @@ class UNet(nn.Module):
             widths=(32, 64, 128, 256, 320),
             activation=nn.LeakyReLU(inplace=True),
             conv_par=None,
+            downsample = DownsampleStrided,
             down_par=None,
             up_par=None,
             head=True
@@ -171,18 +197,18 @@ class UNet(nn.Module):
 
         # ENCODER
         """
-        5 segments composed of double convolution blocks, followed by pooling (downsampling)
+        5 segments composed of double convolution blocks, followed by strided convolutoin (downsampling)
         """
         self.enc_1 = DoubleConv(self.in_channels, self.widths[0], strides=(1,1), activation=activation, conv_par=conv_par)
-        self.down_1 = Downsample(down_par=down_par)
+        self.down_1 = downsample(channels=widths[0], down_par=down_par)
         self.enc_2 = DoubleConv(self.widths[0], self.widths[1], activation=activation, conv_par=conv_par)
-        self.down_2 = Downsample(down_par=down_par)
+        self.down_2 = downsample(channels=widths[1],down_par=down_par)
         self.enc_3 = DoubleConv(self.widths[1], self.widths[2], activation=activation, conv_par=conv_par)
-        self.down_3 = Downsample(down_par=down_par)
+        self.down_3 = downsample(channels=widths[2],down_par=down_par)
         self.enc_4 = DoubleConv(self.widths[2], self.widths[3], activation=activation, conv_par=conv_par)
-        self.down_4 = Downsample(down_par=down_par)
+        self.down_4 = downsample(channels=widths[3],down_par=down_par)
         self.enc_5 = DoubleConv(self.widths[3], self.widths[4], activation=activation, conv_par=conv_par)
-        self.down_5 = Downsample(down_par=down_par)
+        self.down_5 = downsample(channels=widths[4],down_par=down_par)
 
         # BRIDGE
         self.bridge = DoubleConv(self.widths[4], self.widths[4])
@@ -205,7 +231,8 @@ class UNet(nn.Module):
         # Output
         self.final_conv = nn.Conv3d(in_channels=self.widths[0], out_channels=out_channels, kernel_size=1)
         if self.head:
-            self.final_act = nn.Softmax(dim=1)
+            #self.final_act = nn.Softmax(dim=1)
+            self.final_act = nn.Sigmoid()
 
     # Forward propagation
     def forward(self, input):
@@ -268,10 +295,10 @@ if __name__ == '__main__':
 
     # Initialize model
     model = UNet(in_channels=4, out_channels=3, head=True)
-    model2 = UNet(in_channels=4, out_channels=3, head=False)
+    #model2 = UNet(in_channels=4, out_channels=3, head=False)
 
     # Process example input
     out = model(x)
-    out2 = model2(x)
+    #out2 = model2(x)
     log(f'Output size (single image): {out.size()}')
 

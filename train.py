@@ -22,7 +22,7 @@ from models.unet_lightning import UNetLightning
 from training.data_module import BraTSDataModule
 from training.inference import val_inference
 from training.losses import dice_loss, dice_metric, dice_et, dice_tc, dice_wt
-from utils.utils import WarmupCosineSchedule
+from utils.utils import WarmupCosineSchedule, TakeSnapshot
 from utils.helper import set_dir
 from os import pardir
 
@@ -77,16 +77,20 @@ from os import pardir
 
 if __name__ == '__main__':
     # Let's go
-    hlp.set_params(data_dir='../data')
-    hlp.hi("Training baseline UNet")
+    hlp.hi("Training baseline U-Net")
+
+    # Name
+    model_name = 'unet_baseline'
+    version = 0
 
     # Set data directory
     train_dir = join(hlp.DATA_DIR, 'MICCAI_BraTS2020_TrainingData')
     test_dir = join(hlp.DATA_DIR, 'MICCAI_BraTS2020_ValidationData')
-    log_dir = set_dir(join(pardir, 'logs'))
+    tb_dir = join(hlp.LOG_DIR, 'tb_logs', model_name)
+    snap_dir = join(hlp.LOG_DIR, 'snapshots', model_name, f'version_{version}')
 
     # Initialize model
-    log("Initializing UNet model")
+    log(f"Initializing <{model_name}> model")
     model = UNetLightning(
 
         # Architecture settings
@@ -126,20 +130,21 @@ if __name__ == '__main__':
     brats.setup()
 
     # Initialize logger
-    tb_logger = TensorBoardLogger(save_dir=log_dir, name='unet_baseline',default_hp_metric=False,version=0)
+    tb_logger = TensorBoardLogger(save_dir=tb_dir, name=model_name, default_hp_metric=False, version=version)
 
     # Initialize trainer
     log("Initializing trainer")
     trainer = Trainer(
         max_steps=100000,
-        max_epochs=200,
+        max_epochs=50,
         logger=tb_logger,
         gpus=1,
-        # num_nodes=1,
+        num_nodes=1,
         # distributed_backend='ddp',
         callbacks=[
             LearningRateMonitor(logging_interval="step"),
             PrintTableMetricsCallback(),
+            TakeSnapshot(epochs=(1, 24, 49), save_dir=snap_dir)
         ],
     )
 
@@ -147,3 +152,8 @@ if __name__ == '__main__':
     log("Commencing training")
     trainer.fit(model=model,
                 datamodule=brats)
+
+    # Test
+    log("Evaluating model")
+    trainer.test(model=model,
+                 datamodule=brats)
