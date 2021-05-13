@@ -52,8 +52,9 @@ def hi(title=None):
     if title:
         log(title, title=True)
 
-    print("VERBOSITY is set to {}.".format(VERBOSITY))
-    print("DATA_DIR is set to {}".format(DATA_DIR))
+    print(f"VERBOSITY is set to {VERBOSITY}")
+    print(f"DATA_DIR is set to {DATA_DIR}")
+    print(f"LOG_DIR is set to {LOG_DIR}")
     print()
 
     # Set seed
