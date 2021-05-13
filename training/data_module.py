@@ -69,7 +69,6 @@ class BraTSDataModule(LightningDataModule):
     def __init__(
             self,
             data_dir=None,
-            test_dir=None,
             num_workers=0,
             batch_size=1,
             validation_size=0.2,
@@ -78,7 +77,6 @@ class BraTSDataModule(LightningDataModule):
 
         # Directories (TrainingData & ValidationData)
         self.data_dir = data_dir
-        self.test_dir = test_dir
 
         # Number of workers (for leveraging multi-core CPU/GPU)
         self.num_workers = num_workers
@@ -100,6 +98,30 @@ class BraTSDataModule(LightningDataModule):
         self.training_data, self.validation_data, self.test_data, self.visualization_data = None, None, None, None
         self.training_set, self.validation_set, self.test_set, self.visualization_set = None, None, None, None
 
+        """We won't be using the test set, because it involves the use of the online BraTS platform
+        to calculate performance metrics. Hence, we will calculate the split here, rather than at setup.
+        We must be careful, however, to not use the validation set for any purpose during training (including
+        early stopping or learning rate scheduling)."""
+
+        # Get data paths
+        self.data = get_data(self.data_dir)
+
+        # Split data into training and validation
+        (
+            self.training_data,
+            self.validation_data,
+        ) = train_test_split(
+            self.data,
+            test_size=self.validation_size,
+            random_state=616,
+        )
+
+        # Performance metrics will be calculated on the validation dataset as well
+        self.test_data = self.validation_data
+
+        # Visualization of results will also use the validation dataset
+        self.visualization_data = self.validation_data
+
     ################################################################
     # SET UP MODULE for fitting, testing or visualization (or all) #
     ################################################################
@@ -108,18 +130,6 @@ class BraTSDataModule(LightningDataModule):
 
         # Assign training datasets (train & val) for use in dataloaders
         if stage == "fit" or stage is None:
-            # Get train/validation data (paths)
-            self.data = get_data(self.data_dir)
-
-            # Split data into training and validation
-            (
-                self.training_data,
-                self.validation_data,
-            ) = train_test_split(
-                self.data,
-                test_size=self.validation_size,
-                random_state=616,
-            )
 
             # Build training and validation sets (monai Dataset subclass)
             self.training_set = Dataset(
@@ -133,8 +143,6 @@ class BraTSDataModule(LightningDataModule):
 
         # Assign test dataset for use in dataloader(s)
         if stage == "test" or stage is None:
-            # Get test data (paths)
-            self.test_data = get_data(self.test_dir, labeled=False)
 
             # Build test set
             self.test_set = Dataset(
@@ -144,8 +152,6 @@ class BraTSDataModule(LightningDataModule):
 
         # Assign test dataset for visualization (inspect the results of our training)
         if stage == "visualize" or stage is None:
-            # Get test subjects
-            self.visualization_data = get_data(self.test_dir, labeled=False)
 
             # Build visualization set
             self.visualization_set = Dataset(
