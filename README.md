@@ -18,6 +18,5 @@ This repository hosts the code for my thesis at KULeuven, in order to obtain the
 * Add **operational training script**  
   * (maybe) move parameters to dict-style **config file**  
   * (maybe) include **terminal-based** run-script (see example by Pooya)  
-  * Sort out final activation: model can be initiated with or without Softmax activation, but additional posttransform is needed in the latter case  
-* Fix test inference
-* Sort out logging progress bar (it works, but it's not what I want)
+* Visualize some images & masks
+* LIGHTWEIGHT LAYERS!
