@@ -75,7 +75,7 @@ class BraTSDataModule(LightningDataModule):
     ):
         super().__init__()
 
-        # Directories (TrainingData & ValidationData)
+        # Directories (TrainingData only)
         self.data_dir = data_dir
 
         # Number of workers (for leveraging multi-core CPU/GPU)
@@ -196,7 +196,6 @@ if __name__ == '__main__':
     # Use helper.set_params
     root_dir = DATA_DIR
     train_dir = join(DATA_DIR, 'MICCAI_BraTS2020_TrainingData')
-    test_dir = join(DATA_DIR, 'MICCAI_BraTS2020_ValidationData')
 
-    brats = BraTSDataModule(data_dir=train_dir, test_dir=test_dir)
+    brats = BraTSDataModule(data_dir=train_dir)
     brats.setup()

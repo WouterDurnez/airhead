@@ -129,7 +129,7 @@ def time_it(f: Callable):
     return timed
 
 
-def set_dir(dir) -> str:
+def set_dir(*dirs):
     """
     If folder doesn't exist, make it.
 
@@ -137,10 +137,9 @@ def set_dir(dir) -> str:
     :return: path to dir
     """
 
-    if not os.path.exists(dir):
-        os.makedirs(dir)
-        log("WARNING: Data directory <{dir}> did not exist yet, and was created.".format(dir=dir), verbosity=1)
-    else:
-        log("\'{}\' folder accounted for.".format(dir), verbosity=3)
-
-    return dir
+    for dir in dirs:
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+            log("WARNING: Data directory <{dir}> did not exist yet, and was created.".format(dir=dir), verbosity=1)
+        else:
+            log("\'{}\' folder accounted for.".format(dir), verbosity=3)
