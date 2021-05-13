@@ -165,6 +165,7 @@ def get_val_transform():
             keys=["input", "target"],
             spatial_size=[128, 128, 128],
             mode=("trilinear", "nearest"),
+            align_corners=False,
         ),
         NormalizeIntensityd(keys="input", nonzero=True, channel_wise=True),
         ToTensord(keys=["input", "target"]),
@@ -186,12 +187,13 @@ def get_test_transform():
     """
 
     transforms = [
-        LoadImaged(keys="input", reader="ITKReader"),
+        LoadImaged(keys=["input","target"], reader="ITKReader"),
+        OneHotEncoder(keys="target"),
         NormalizeIntensityd(keys="input", nonzero=True, channel_wise=True),
-        ToTensord(keys="input"),
+        ToTensord(keys=["input", "target"]),
     ]
-    validation_transform = Compose(transforms)
-    return validation_transform
+    test_transform = Compose(transforms)
+    return test_transform
 
 
 # Visualization transforms

@@ -84,6 +84,9 @@ class UNetLightning(LightningModule):
             {} if test_inference_params is None else test_inference_params
         )
 
+        # Test results
+        self.test_results = None
+
         # Save hyperparameters
         self.save_hyperparameters()
 
@@ -131,10 +134,10 @@ class UNetLightning(LightningModule):
     def training_epoch_end(self, outputs):
 
         # Metrics we'll log
-        metric_names = dict.fromkeys(outputs[0])
+        metrics_dict = dict.fromkeys(outputs[0])
 
         # Loop over metrics
-        for metric_name in metric_names:
+        for metric_name in metrics_dict:
 
             # Average metric over outputs within epoch
             metric_total = 0.0
@@ -167,10 +170,10 @@ class UNetLightning(LightningModule):
     def validation_epoch_end(self, outputs):
 
         # Metrics we'll log
-        metric_names = dict.fromkeys(outputs[0])
+        metrics_dict = dict.fromkeys(outputs[0])
 
         # Loop over metrics
-        for metric_name in metric_names:
+        for metric_name in metrics_dict:
 
             # Average metric over outputs within epoch
             metric_total = 0.0
@@ -199,7 +202,7 @@ class UNetLightning(LightningModule):
         return output"""
 
         # Get new input and predict, then calculate loss
-        x, y, id_ = batch["input"], batch["target"], batch["id"]
+        x, y, id = batch["input"], batch["target"], batch["id"]
 
         # Infer and time inference
         start = time()
@@ -207,10 +210,11 @@ class UNetLightning(LightningModule):
         end = time()
 
         # Calculate metrics
-        id_ = id_[0] if len(id_) == 1 else tuple(id_)
+        id = id[0] if len(id) == 1 else tuple(id)
 
         # Output dict with duration of inference
-        output = {"id": id_, "time": end - start}
+        output = {"id": id, "time": end - start}
+        #output = {'time': end-start}
 
         # Add other metrics to output dict
         for m, pars in zip(self.metrics, self.metrics_params):
@@ -226,4 +230,5 @@ class UNetLightning(LightningModule):
 
     # Test epoch end
     def test_epoch_end(self, outputs):
-        self.validation_epoch_end(outputs)
+        self.test_results = outputs
+

@@ -9,6 +9,8 @@ Main training script
 """
 
 from os.path import join
+import numpy as np
+import torch.cuda
 from pytorch_lightning import Trainer
 from pl_bolts.callbacks import PrintTableMetricsCallback
 from pytorch_lightning.callbacks import LearningRateMonitor
@@ -25,55 +27,12 @@ from training.losses import dice_loss, dice_metric, dice_et, dice_tc, dice_wt, h
 from utils.utils import WarmupCosineSchedule, TakeSnapshot
 from utils.helper import set_dir
 from os import pardir
+from pprint import PrettyPrinter
+from ptflops import get_model_complexity_info
 
-"""CONFIG = {
-    "system_path": [],
-    "data": {
-        "datamodule": BraTSDataModule,
-        "datamodule_params": {
-            "data_dir": "~/MICCAI_BraTS2020_TrainingData",
-            "validation_size": 0.2,
-            "num_workers": 0,
-            "batch_size": 1,
-        },
-    },
-    "model": {
-        "network": UNet,
-        "network_params": {
-            "in_channels": 4,
-            "out_channels": 3,
-            "encoder_depth": (1, 2, 2, 2, 2),
-            "encoder_width": (32, 64, 128, 256, 320),
-            "strides": (1, 2, 2, 2, 2),
-            "decoder_depth": (2, 2, 2, 2),
-            "upsample": "tconv",
-            "block": unet.BasicBlock,
-            "block_params": None,
-        },
-        "inference": val_inference,
-        "inference_params": None,
-    },
-    "optimization": {
-        "loss": dice_loss,
-        "metrics": [dice_metric, dice_et, dice_tc, dice_wt],
-        "optimizer": optim.AdamW,
-        "optimizer_params": {"lr": 1e-4, "weight_decay": 1e-2},
-        "scheduler": WarmupCosineSchedule,
-        "scheduler_params": {"warmup_steps": 0, "total_steps": 100000},
-        "scheduler_config": {"interval": "step"},
-    },
-    "training": {
-        "max_steps": 100000,
-        "max_epochs": 200,
-        # "gpus": 1,
-        # "num_nodes": 1,
-        # "distributed_backend": "ddp",
-        "callbacks": [
-            LearningRateMonitor(logging_interval="step"),
-            PrintTableMetricsCallback(),
-        ],
-    },
-}"""
+
+pp = PrettyPrinter()
+
 
 if __name__ == '__main__':
     # Let's go
@@ -81,12 +40,14 @@ if __name__ == '__main__':
 
     # Name
     model_name = 'unet_baseline'
-    version = 1
+    version = 0
 
     # Set data directory
     train_dir = join(hlp.DATA_DIR, 'MICCAI_BraTS2020_TrainingData')
     tb_dir = join(hlp.LOG_DIR, 'tb_logs', model_name)
-    snap_dir = join(hlp.LOG_DIR, 'snapshots', model_name, f'version_{version}')
+    snap_dir = join(hlp.LOG_DIR, 'snapshots', model_name)
+    result_dir = join(hlp.LOG_DIR, 'results', model_name)
+    set_dir(train_dir, tb_dir, snap_dir, result_dir)
 
     # Initialize model
     log(f"Initializing <{model_name}> model")
@@ -112,7 +73,7 @@ if __name__ == '__main__':
         # Learning rate scheduler
         scheduler=WarmupCosineSchedule,
         scheduler_config={'interval': 'step'},
-        scheduler_params={'warmup_steps': 0, 'total_steps': 1e5},
+        scheduler_params={'warmup_steps': 5, 'total_steps': 1e5},
 
         # Inference method
         inference=val_inference,
@@ -124,14 +85,12 @@ if __name__ == '__main__':
     )
 
     # Load checkpoint
-    '''print('Checkpoint path:', join(snap_dir,'epoch=49.ckpt'))
-    model.load_from_checkpoint(checkpoint_path=join(snap_dir,'epoch=49.ckpt'))'''
+    #model.load_from_checkpoint(checkpoint_path=join(snap_dir,'epoch=1.ckpt'))
 
     # Initialize data module
     log("Initializing data module")
     brats = BraTSDataModule(data_dir=train_dir,
-                            num_workers=4,
-                            # TODO: Increasing num_workers causes error
+                            num_workers=8,
                             batch_size=1,
                             validation_size=.2)
     brats.setup()
@@ -143,7 +102,7 @@ if __name__ == '__main__':
     log("Initializing trainer")
     trainer = Trainer(
         max_steps=100000,
-        max_epochs=1,
+        max_epochs=80,
         logger=tb_logger,
         gpus=1,
         num_nodes=1,
@@ -167,3 +126,16 @@ if __name__ == '__main__':
     log("Evaluating model")
     trainer.test(model=model,
                  datamodule=brats)
+    results = model.test_results
+
+    # Adding model parameters
+    with torch.cuda.device(0):
+        macs, params = get_model_complexity_info(model=model, input_res=(4,128,128,128), as_strings=True, print_per_layer_stat=True, verbose=True)
+
+    eval = {'results': results}
+    eval['n_param'] = model.get_n_parameters()
+    eval['flops_count'] = macs
+    eval['params'] = params
+
+    # Save test results
+    np.save(file=join(result_dir, f'{model_name}_v{version}.npy'), arr=results)
