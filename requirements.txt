@@ -12,3 +12,4 @@ torchvision
 matplotlib
 gym
 ptflops
+tensornetwork

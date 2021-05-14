@@ -165,7 +165,6 @@ def get_val_transform():
             keys=["input", "target"],
             spatial_size=[128, 128, 128],
             mode=("trilinear", "nearest"),
-            align_corners=False,
         ),
         NormalizeIntensityd(keys="input", nonzero=True, channel_wise=True),
         ToTensord(keys=["input", "target"]),
