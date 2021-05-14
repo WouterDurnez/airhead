@@ -30,9 +30,7 @@ from os import pardir
 from pprint import PrettyPrinter
 from ptflops import get_model_complexity_info
 
-
 pp = PrettyPrinter()
-
 
 if __name__ == '__main__':
     # Let's go
@@ -73,7 +71,7 @@ if __name__ == '__main__':
         # Learning rate scheduler
         scheduler=WarmupCosineSchedule,
         scheduler_config={'interval': 'step'},
-        scheduler_params={'warmup_steps': 5, 'total_steps': 1e5},
+        scheduler_params={'warmup_steps': 3*3e2, 'total_steps': 1e5},
 
         # Inference method
         inference=val_inference,
@@ -85,7 +83,7 @@ if __name__ == '__main__':
     )
 
     # Load checkpoint
-    #model.load_from_checkpoint(checkpoint_path=join(snap_dir,'epoch=1.ckpt'))
+    # model.load_from_checkpoint(checkpoint_path=join(snap_dir,'epoch=1.ckpt'))
 
     # Initialize data module
     log("Initializing data module")
@@ -102,7 +100,7 @@ if __name__ == '__main__':
     log("Initializing trainer")
     trainer = Trainer(
         max_steps=100000,
-        max_epochs=80,
+        max_epochs=100,
         logger=tb_logger,
         gpus=1,
         num_nodes=1,
@@ -130,7 +128,8 @@ if __name__ == '__main__':
 
     # Adding model parameters
     with torch.cuda.device(0):
-        macs, params = get_model_complexity_info(model=model, input_res=(4,128,128,128), as_strings=True, print_per_layer_stat=True, verbose=True)
+        macs, params = get_model_complexity_info(model=model, input_res=(4, 128, 128, 128), as_strings=True,
+                                                 print_per_layer_stat=True, verbose=False)
 
     eval = {'results': results}
     eval['n_param'] = model.get_n_parameters()
