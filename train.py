@@ -121,6 +121,8 @@ if __name__ == '__main__':
     trainer.save_checkpoint(join(snap_dir, f'final_{model_name}_v{version}.ckpt'))
 
     # Test
+    torch.cuda.empty_cache()
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     log("Evaluating model")
     trainer.test(model=model,
                  datamodule=brats)

@@ -38,31 +38,6 @@ class DownsampleMax(nn.Module):
     def forward(self, input):
         return (self.block(input))
 
-# Downsample using strided convolutions
-class DownsampleStrided(nn.Module):
-
-    def __init__(self,
-                 channels,
-                 down_par=None):
-        super().__init__()
-        self.__name__ = 'strided_conv'
-
-        # Initialize parameters if not given
-        down_par = down_par if down_par else {}
-        down_par.setdefault('kernel_size', 1)
-        down_par.setdefault('stride', 2)
-        down_par.setdefault('padding', 0)
-
-        self.block = nn.Sequential(
-            nn.Conv3d(in_channels=channels,
-                      out_channels=channels,
-                      **down_par)
-        )
-
-    # Forward propagation
-    def forward(self, input):
-        return (self.block(input))
-
 
 # Double convolution block
 class DoubleConv(nn.Module):
@@ -157,7 +132,7 @@ class UNet(nn.Module):
             widths=(32, 64, 128, 256, 320),
             activation=nn.LeakyReLU(inplace=True),
             conv_par=None,
-            downsample = DownsampleStrided,
+            downsample = 'strided_convolution',
             down_par=None,
             up_par=None,
             head=True
@@ -170,6 +145,8 @@ class UNet(nn.Module):
         self.widths = widths
         self.head = head
 
+        assert downsample == 'strided_convolution', 'Adjust model architecture to use downsample method other than strided convolution!'
+
         ##############
         # Parameters #
         ##############
@@ -180,10 +157,10 @@ class UNet(nn.Module):
         conv_par.setdefault('padding', 1)
 
         # Set default parameters for downsampling (max pooling)
-        down_par = down_par if down_par else {}
+        '''down_par = down_par if down_par else {}
         down_par.setdefault('kernel_size', 2)
         down_par.setdefault('stride', 2)
-        down_par.setdefault('padding', 0)
+        down_par.setdefault('padding', 0)'''
 
         # Set default parameters for upsampling (transposed convolution)
         up_par = up_par if up_par else {}
@@ -200,15 +177,15 @@ class UNet(nn.Module):
         5 segments composed of double convolution blocks, followed by strided convolutoin (downsampling)
         """
         self.enc_1 = DoubleConv(self.in_channels, self.widths[0], strides=(1,1), activation=activation, conv_par=conv_par)
-        self.down_1 = downsample(channels=widths[0], down_par=down_par)
+        #self.down_1 = downsample(channels=widths[0], down_par=down_par)
         self.enc_2 = DoubleConv(self.widths[0], self.widths[1], activation=activation, conv_par=conv_par)
-        self.down_2 = downsample(channels=widths[1],down_par=down_par)
+        #self.down_2 = downsample(channels=widths[1],down_par=down_par)
         self.enc_3 = DoubleConv(self.widths[1], self.widths[2], activation=activation, conv_par=conv_par)
-        self.down_3 = downsample(channels=widths[2],down_par=down_par)
+        #self.down_3 = downsample(channels=widths[2],down_par=down_par)
         self.enc_4 = DoubleConv(self.widths[2], self.widths[3], activation=activation, conv_par=conv_par)
-        self.down_4 = downsample(channels=widths[3],down_par=down_par)
+        #self.down_4 = downsample(channels=widths[3],down_par=down_par)
         self.enc_5 = DoubleConv(self.widths[3], self.widths[4], activation=activation, conv_par=conv_par)
-        self.down_5 = downsample(channels=widths[4],down_par=down_par)
+        #self.down_5 = downsample(channels=widths[4],down_par=down_par)
 
         # BRIDGE
         self.bridge = DoubleConv(self.widths[4], self.widths[4])
@@ -284,7 +261,7 @@ if __name__ == '__main__':
     # Console parameters
     set_params(verbosity=3, timestamped=False)
 
-    # Quick test (currently no cuda support on my end)
+    # Quick test
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Create appropriately dimensioned tensor with random values
@@ -294,7 +271,7 @@ if __name__ == '__main__':
     log(f'Input size (single image): {x.size()}')
 
     # Initialize model
-    model = UNet(in_channels=4, out_channels=3, head=True)
+    model = UNet(in_channels=4, out_channels=3, head=True, downsample='maxpool')
     #model2 = UNet(in_channels=4, out_channels=3, head=False)
 
     # Process example input
