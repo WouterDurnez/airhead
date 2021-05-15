@@ -178,6 +178,7 @@ class BraTSDataModule(LightningDataModule):
             self.validation_set,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
+            pin_memory=True,
         )
         return validation_loader
 
@@ -186,6 +187,7 @@ class BraTSDataModule(LightningDataModule):
             self.test_set,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
+            pin_memory=True,
         )
         return test_loader
 
