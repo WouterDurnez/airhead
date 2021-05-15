@@ -157,10 +157,12 @@ if __name__ == '__main__':
     image = torch.rand(1, 4, dim, dim, dim)
     image = image.to(device)
 
-    canon = CanonicalLayer(5,batch_size,in_channels,out_channels,kernel_dim)
+    #canon = CanonicalLayer(5,batch_size,in_channels,out_channels,kernel_dim)
+
+    #### MANUAL CONVOLUTION BELOW ####
 
     # We'll need padding
-    '''image_new = F.pad(input=image, pad=(1, 1, 1, 1, 1, 1), mode='constant', value=0)
+    image_new = F.pad(input=image, pad=(1, 1, 1, 1, 1, 1), mode='constant', value=0)
     dim_pad = image_new.size(-1)
     print('padding image:', image.size(), '-->', image_new.size())
 
@@ -191,20 +193,3 @@ if __name__ == '__main__':
 
     model_result = layer_classic(image)
 
-    print((manual_result - model_result).abs().max())'''
-
-    '''print(res.shape)  # batch_size, output_pixels, out_channels
-    res = res.permute(0, 2, 1)  # batch_size, out_channels, output_pixels
-    # assuming h = w
-    h = w = int(res.size(2) ** 0.5)
-    res = res.view(batch_size, -1, h, w)
-
-    # Module approach
-    out = conv(image)
-    # Can we fold it back?
-    '''
-
-    '''neat = patches_new.permute(0,2,1,3,4,5)
-    neat = neat.contiguous().view(batch_size, in_channels, n_windows, n_windows, n_windows, kernel_dim, kernel_dim, kernel_dim)
-
-    neat_new = F.fold(neat,image_new.size()[2:],kernel_size=kernel_dim,stride=stride)'''
