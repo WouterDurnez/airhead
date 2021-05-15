@@ -193,3 +193,4 @@ if __name__ == '__main__':
 
     model_result = layer_classic(image)
 
+    print((manual_result - model_result).abs().mean())
