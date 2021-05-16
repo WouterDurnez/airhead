@@ -1,5 +1,6 @@
 torch
 pytorch-lightning
+pytorch-lightning-bolts
 monai
 sklearn
 scipy
