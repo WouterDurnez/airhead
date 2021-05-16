@@ -10,8 +10,8 @@ from pytorch_lightning import seed_everything
 
 VERBOSITY = 3
 TIMESTAMPED = False
-DATA_DIR = '../data'
-LOG_DIR = '../logs'
+DATA_DIR = '../../data'
+LOG_DIR = '../../logs'
 
 
 # Set parameters
@@ -29,12 +29,16 @@ def set_params(verbosity: int = None, timestamped: bool = None, data_dir: str = 
     DATA_DIR = data_dir if data_dir else DATA_DIR
     LOG_DIR = log_dir if log_dir else LOG_DIR
 
+    DATA_DIR = os.path.abspath(DATA_DIR)
+    LOG_DIR = os.path.abspath(LOG_DIR)
+
     if data_dir:
         log("DATA_DIR is now set to {}".format(DATA_DIR), verbosity=1)
     if verbosity:
         log("VERBOSITY is set to {}".format(TIMESTAMPED),verbosity=1)
     if log_dir:
         log("LOG_DIR is set to {}".format(LOG_DIR),verbosity=1)
+
 
 def hi(title=None):
     """
