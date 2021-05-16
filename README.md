@@ -14,9 +14,15 @@ This repository hosts the code for my thesis at KULeuven, in order to obtain the
 
 
 ### TODOs  
-  
-* Add **operational training script**  
+
+#### General
+* Visualize some images & masks
+
+#### Training
   * (maybe) move parameters to dict-style **config file**  
   * (maybe) include **terminal-based** run-script (see example by Pooya)  
-* Visualize some images & masks
-* LIGHTWEIGHT LAYERS!
+#### Evaluation
+  * Write predicted masks to disk and compare (visually)
+  * Make sure to use vis_transforms! 
+#### LIGHTWEIGHT LAYERS!
+  * Continue building canonical polyadic decomposed format layer
