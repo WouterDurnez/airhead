@@ -45,10 +45,10 @@ def get_data(root_dir, labeled=True):
         path_dict = {
             'id': id,
             'input': [
-                glob(join(root_dir, id, "*t1*"))[0],
-                glob(join(root_dir, id, "*t1ce*"))[0],
-                glob(join(root_dir, id, "*t2*"))[0],
-                glob(join(root_dir, id, "*flair*"))[0],
+                glob(join(root_dir, id, "*t1.*"))[0],
+                glob(join(root_dir, id, "*t1ce.*"))[0],
+                glob(join(root_dir, id, "*t2.*"))[0],
+                glob(join(root_dir, id, "*flair.*"))[0],
             ]
         }
         # Add path to segmentation target (only for training data)
