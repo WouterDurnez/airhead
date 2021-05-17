@@ -2,21 +2,24 @@
 Helper functions
 """
 
-from typing import Callable
+import os
 import time
-import os, sys
-from torch import Tensor
+from os.path import join
+from pathlib import Path
+from typing import Callable
+
+from colorama import Fore, Style
 from pytorch_lightning import seed_everything
+from torch import Tensor
 
 VERBOSITY = 3
 TIMESTAMPED = False
-DATA_DIR = '../../data'
-LOG_DIR = '../../logs'
+DATA_DIR = join(Path(os.path.dirname(os.path.abspath(__file__))).parents[1], 'data')
+LOG_DIR = join(Path(os.path.dirname(os.path.abspath(__file__))).parents[1], 'logs')
 
 
 # Set parameters
 def set_params(verbosity: int = None, timestamped: bool = None, data_dir: str = None, log_dir: str = None):
-
     global VERBOSITY
     global TIMESTAMPED
     global DATA_DIR
@@ -32,34 +35,36 @@ def set_params(verbosity: int = None, timestamped: bool = None, data_dir: str = 
     DATA_DIR = os.path.abspath(DATA_DIR)
     LOG_DIR = os.path.abspath(LOG_DIR)
 
-    if data_dir:
-        log("DATA_DIR is now set to {}".format(DATA_DIR), verbosity=1)
-    if verbosity:
-        log("VERBOSITY is set to {}".format(TIMESTAMPED),verbosity=1)
-    if log_dir:
-        log("LOG_DIR is set to {}".format(LOG_DIR),verbosity=1)
 
-
-def hi(title=None):
+def hi(title=None, **params):
     """
     Say hello. (It's stupid, I know.)
     If there's anything to initialize, do so here.
     """
 
     print("\n")
+    print(Fore.BLUE, end='')
     print("     ___   _     __               __")
     print("    / _ | (_)___/ /  ___ ___ ____/ /")
     print("   / __ |/ / __/ _ \/ -_) _ `/ _  /")
-    print("  /_/ |_/_/_/ /_//_/\__/\_,_/\_,_/")
+    print("  /_/ |_/_/_/ /_//_/\__/\_,_/\_,_/", end='')
+    print(Style.RESET_ALL)
     print()
 
     if title:
-        log(title, title=True)
+        log(title, title=True, color='blue')
 
-    print(f"VERBOSITY is set to {VERBOSITY}")
-    print(f"DATA_DIR is set to {DATA_DIR}")
-    print(f"LOG_DIR is set to {LOG_DIR}")
+    # Set params on request
+    if params:
+        set_params(**params)
+
+    log(f"VERBOSITY is set to {TIMESTAMPED}", verbosity=1, color='green')
+    log(f"DATA_DIR is now set to {os.path.abspath(DATA_DIR)}", verbosity=1, color='green')
+    log(f"LOG_DIR is set to {os.path.abspath(LOG_DIR)}", verbosity=1, color='green')
     print()
+
+    # Set directories
+    set_dir(DATA_DIR, LOG_DIR)
 
     # Set seed
     seed_everything(616)
@@ -81,7 +86,7 @@ def whatsgoingon(layer: Callable, input: Tensor):
 
 
 # Fancy print
-def log(*message, verbosity=3, timestamped=TIMESTAMPED, sep="", title=False):
+def log(*message, verbosity=3, timestamped=TIMESTAMPED, sep="", title=False, color=None):
     """
     Print wrapper that adds timestamp, and can be used to toggle levels of logging info.
 
@@ -90,8 +95,21 @@ def log(*message, verbosity=3, timestamped=TIMESTAMPED, sep="", title=False):
     :param timestamped: include timestamp at start of log
     :param sep: separator
     :param title: toggle whether this is a title or not
+    :param color: text color
     :return: /
     """
+
+    # Set colors
+    color_dict = {
+        'red': Fore.RED,
+        'blue': Fore.BLUE,
+        'green': Fore.GREEN,
+        'yellow': Fore.YELLOW,
+        'magenta': Fore.MAGENTA,
+        'cyan': Fore.CYAN,
+    }
+    if color and color in color_dict:
+        color = color_dict[color]
 
     # Title always get shown
     verbosity = 1 if title else verbosity
@@ -102,14 +120,18 @@ def log(*message, verbosity=3, timestamped=TIMESTAMPED, sep="", title=False):
         # Print title
         if title:
             n = len(*message)
+            if color:
+                print(color, end='')
             print('\n' + (n + 4) * '#')
             print('# ', *message, ' #', sep='')
-            print((n + 4) * '#' + '\n')
+            print((n + 4) * '#' + '\n' + Style.RESET_ALL)
 
         # Print regular
         else:
             t = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-            print((str(t) + (" - " if sep == "" else "-")) if timestamped else "", *message, sep=sep)
+            if color:
+                print(color, end='')
+            print((str(t) + (" - " if sep == "" else "-")) if timestamped else "", *message, Style.RESET_ALL, sep=sep)
 
     return
 
@@ -147,3 +169,7 @@ def set_dir(*dirs):
             log("WARNING: Data directory <{dir}> did not exist yet, and was created.".format(dir=dir), verbosity=1)
         else:
             log("\'{}\' folder accounted for.".format(dir), verbosity=3)
+
+
+if __name__ == '__main__':
+    hi('Test!')
