@@ -9,26 +9,26 @@ Main training script
 """
 
 from os.path import join
+from pprint import PrettyPrinter
+
 import numpy as np
 import torch.cuda
-from pytorch_lightning import Trainer
 from pl_bolts.callbacks import PrintTableMetricsCallback
+from ptflops import get_model_complexity_info
+from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor
-from torch import optim
 from pytorch_lightning.loggers import TensorBoardLogger
+from torch import optim
 
-from utils import helper as hlp
-from utils.helper import log
 from models.unet import UNet
 from models.unet_lightning import UNetLightning
 from training.data_module import BraTSDataModule
 from training.inference import val_inference, test_inference
 from training.losses import dice_loss, dice_metric, dice_et, dice_tc, dice_wt, hd_metric, hd_et, hd_tc, hd_wt
-from utils.utils import WarmupCosineSchedule, TakeSnapshot
+from utils import helper as hlp
+from utils.helper import log
 from utils.helper import set_dir
-from os import pardir
-from pprint import PrettyPrinter
-from ptflops import get_model_complexity_info
+from utils.utils import WarmupCosineSchedule, TakeSnapshot
 
 pp = PrettyPrinter()
 
