@@ -26,7 +26,6 @@ from training.inference import val_inference, test_inference
 from training.losses import dice_loss, dice_metric, dice_et, dice_tc, dice_wt, hd_metric, hd_et, hd_tc, hd_wt
 from utils.utils import WarmupCosineSchedule, TakeSnapshot
 from utils.helper import set_dir
-from os import pardir
 from pprint import PrettyPrinter
 from ptflops import get_model_complexity_info
 

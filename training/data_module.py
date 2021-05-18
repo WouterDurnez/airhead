@@ -196,8 +196,6 @@ if __name__ == '__main__':
 
     # Set path to directories
     # Use helper.set_params
-    root_dir = DATA_DIR
-    train_dir = join(DATA_DIR, 'MICCAI_BraTS2020_TrainingData')
 
-    brats = BraTSDataModule(data_dir=train_dir)
+    brats = BraTSDataModule(data_dir=DATA_DIR)
     brats.setup()

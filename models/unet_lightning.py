@@ -71,7 +71,7 @@ class UNetLightning(LightningModule):
                 {} if scheduler_params is None else scheduler_params
             )
             self.scheduler_config = (
-                {} if scheduler_config is None else scheduler_config
+                {} if not scheduler_config is None else scheduler_config
             )
 
         # Set inference methods

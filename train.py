@@ -41,11 +41,11 @@ if __name__ == '__main__':
     version = 0
 
     # Set data directory
-    train_dir = join(hlp.DATA_DIR, 'MICCAI_BraTS2020_TrainingData')
+    data_dir = hlp.DATA_DIR
     tb_dir = join(hlp.LOG_DIR, 'tb_logs', model_name)
     snap_dir = join(hlp.LOG_DIR, 'snapshots', model_name)
     result_dir = join(hlp.LOG_DIR, 'results', model_name)
-    set_dir(train_dir, tb_dir, snap_dir, result_dir)
+    set_dir(data_dir, tb_dir, snap_dir, result_dir)
 
     # Initialize model
     log(f"Initializing <{model_name}> model")
@@ -87,7 +87,7 @@ if __name__ == '__main__':
 
     # Initialize data module
     log("Initializing data module")
-    brats = BraTSDataModule(data_dir=train_dir,
+    brats = BraTSDataModule(data_dir=join(data_dir,"MICCAI_BraTS2020_TrainingData"),
                             num_workers=8,
                             batch_size=1,
                             validation_size=.2)

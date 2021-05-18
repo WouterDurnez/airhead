@@ -13,7 +13,7 @@ from pytorch_lightning import seed_everything
 from torch import Tensor
 
 VERBOSITY = 3
-TIMESTAMPED = False
+TIMESTAMPED = True
 DATA_DIR = join(Path(os.path.dirname(os.path.abspath(__file__))).parents[1], 'data')
 LOG_DIR = join(Path(os.path.dirname(os.path.abspath(__file__))).parents[1], 'logs')
 
@@ -58,9 +58,9 @@ def hi(title=None, **params):
     if params:
         set_params(**params)
 
-    log(f"VERBOSITY is set to {TIMESTAMPED}", verbosity=1, color='green')
-    log(f"DATA_DIR is now set to {os.path.abspath(DATA_DIR)}", verbosity=1, color='green')
-    log(f"LOG_DIR is set to {os.path.abspath(LOG_DIR)}", verbosity=1, color='green')
+    log(f"VERBOSITY is set to {VERBOSITY}", verbosity=1, timestamped=False, color='green')
+    log(f"DATA_DIR is now set to {os.path.abspath(DATA_DIR)}", timestamped=False, verbosity=1, color='green')
+    log(f"LOG_DIR is set to {os.path.abspath(LOG_DIR)}", timestamped=False, verbosity=1, color='green')
     print()
 
     # Set directories

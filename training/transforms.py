@@ -78,7 +78,7 @@ class OneHotEncoder(MapTransform):
 
                 d[key] = np.stack(result, axis=0).astype(np.float32)
 
-        # Differential zones
+        # Disjunct zones
         else:
             d = dict(data)
             for key in self.keys:

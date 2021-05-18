@@ -8,16 +8,26 @@
 Inference functions
 i.e. pass (unseen) input through the model and see what it says
 """
-from monai.transforms import Compose
-from monai.transforms import Activations, AsDiscrete
-from monai.inferers import sliding_window_inference
-import torch
-import torch.nn as nn
+from os.path import join
 
+import SimpleITK as sitk
+from monai.inferers import sliding_window_inference
+from monai.transforms import Activations, AsDiscrete
+from monai.transforms import Compose
+from torch import optim
+
+import utils.helper as hlp
+from data_module import BraTSDataModule
+from models.unet import UNet
+from models.unet_lightning import UNetLightning
+from training.losses import *
+from utils.utils import WarmupCosineSchedule
+from tqdm import tqdm
 
 ####################################################
 # Inference functions for validation and test data #
 ####################################################
+
 
 def val_inference(input: torch.Tensor, model: nn.Module):
     """
@@ -39,7 +49,7 @@ def val_inference(input: torch.Tensor, model: nn.Module):
 
     # If it's the right type of model, containing our 'head' parameter,
     # check if the head is there, otherwise add sigmoid as posttransform
-    if hasattr(model,'head'):
+    if hasattr(model, 'head'):
         if not model.head:
             post_trans_list.insert(0, Activations(sigmoid=True))
 
@@ -72,7 +82,7 @@ def test_inference(input: torch.Tensor, model: nn.Module):
 
     # If it's the right type of model, containing our 'head' parameter,
     # check if the head is there, otherwise add sigmoid as posttransform
-    if hasattr(model,'head'):
+    if hasattr(model, 'head'):
         if not model.head:
             post_trans_list.insert(0, Activations(sigmoid=True))
 
@@ -83,3 +93,85 @@ def test_inference(input: torch.Tensor, model: nn.Module):
     return output
 
 
+##############
+# Prediction #
+##############
+
+def predict(model: torch.nn.Module, sample: dict, device: torch.device, model_name: str, write_dir: str = None):
+    if write_dir is None:
+        write_dir = join(hlp.LOG_DIR, 'images', model_name)
+        hlp.set_dir(write_dir)
+
+    # Unpack
+    #subject = sample['id']
+    image = sample['input'].to(device)
+    image = image.unsqueeze(0)
+
+    # Make prediction
+    prediction = test_inference(input=image, model=model).squeeze(0)
+
+    # Channel order: ET, TC, WT
+
+    return prediction
+
+
+if __name__ == '__main__':
+    hlp.hi('Prediction test')
+
+    # Set parameters
+    model_name = 'unet_baseline'
+    version = 0
+    write_dir = join(hlp.DATA_DIR, 'predictions', model_name)
+    hlp.set_dir(write_dir)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    # Load model
+    model = UNetLightning(
+
+        # Architecture settings
+        network=UNet,
+        network_params={
+            'in_channels': 4,
+            'out_channels': 3,
+            'widths': (32, 64, 128, 256, 320),
+            'head': False},
+
+        # Loss and metrics
+        loss=dice_loss,
+        metrics=[dice_metric, dice_et, dice_tc, dice_wt,
+                 hd_metric, hd_et, hd_tc, hd_wt],
+
+        # Optimizer
+        optimizer=optim.AdamW,  # TODO: Why AdamW?
+        optimizer_params={'lr': 1e-4, 'weight_decay': 1e-2},
+
+        # Learning rate scheduler
+        scheduler=WarmupCosineSchedule,
+        scheduler_config={'interval': 'step'},
+        scheduler_params={'warmup_steps': 3 * 3e2, 'total_steps': 1e5},
+
+        # Inference method
+        inference=val_inference,
+        inference_params=None,
+
+        # Test inference method
+        test_inference=test_inference,
+        test_inference_params=None, )
+
+    # Load from checkpoint
+    checkpoint_path = join(hlp.LOG_DIR, 'snapshots', model_name, f'final_{model_name}_v{version}.ckpt')
+    model = model.load_from_checkpoint(checkpoint_path=checkpoint_path)
+    model = model.to(device)
+
+    # Predict a sample
+    brats = BraTSDataModule(data_dir=join(hlp.DATA_DIR, "MICCAI_BraTS2020_TrainingData"), num_workers=2)
+    brats.setup('visualize')
+
+    # Predict all samples
+    for sample in tqdm(brats.visualization_set, f"Predicting samples using {model_name} model"):
+
+        with torch.no_grad():
+            test = predict(model=model, sample=sample, model_name=model_name, device=device, write_dir=write_dir).detach()
+
+        test = sitk.GetImageFromArray(test.cpu().numpy())
+        sitk.WriteImage(image=test, fileName=join(write_dir, f'pred_{sample["id"]}.nii.gz'))

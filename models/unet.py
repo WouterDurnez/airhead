@@ -133,7 +133,7 @@ class UNet(nn.Module):
             activation=nn.LeakyReLU(inplace=True),
             conv_par=None,
             downsample = 'strided_convolution',
-            down_par=None,
+            #down_par=None,
             up_par=None,
             head=True
     ):
@@ -271,7 +271,7 @@ if __name__ == '__main__':
     log(f'Input size (single image): {x.size()}')
 
     # Initialize model
-    model = UNet(in_channels=4, out_channels=3, head=True, downsample='maxpool')
+    model = UNet(in_channels=4, out_channels=3, head=True, downsample='strided_convolution')
     #model2 = UNet(in_channels=4, out_channels=3, head=False)
 
     # Process example input
