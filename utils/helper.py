@@ -67,7 +67,7 @@ def hi(title=None, **params):
     set_dir(DATA_DIR, LOG_DIR)
 
     # Set seed
-    seed_everything(616)
+    seed_everything(616, workers=True)
 
 
 # Expand on what happens to input when sent through layer

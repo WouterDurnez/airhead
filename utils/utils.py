@@ -30,7 +30,7 @@ class WarmupCosineSchedule(LambdaLR):
 
         self.warmup_steps = warmup_steps
         self.total_steps = total_steps
-        super(WarmupCosineSchedule, self).__init__(
+        super().__init__(
             optimizer, self.lr_lambda, last_epoch=last_epoch
         )
 

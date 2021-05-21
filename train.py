@@ -38,14 +38,15 @@ if __name__ == '__main__':
 
     # Name
     model_name = 'unet_baseline'
-    version = 0
+    version = 1
 
     # Set data directory
     data_dir = hlp.DATA_DIR
-    tb_dir = join(hlp.LOG_DIR, 'tb_logs', model_name)
+    tb_dir = join(hlp.LOG_DIR, 'tb_logs')
     snap_dir = join(hlp.LOG_DIR, 'snapshots', model_name)
     result_dir = join(hlp.LOG_DIR, 'results', model_name)
-    set_dir(data_dir, tb_dir, snap_dir, result_dir)
+    model_dir = join(hlp.LOG_DIR, 'models', model_name)
+    set_dir(data_dir, tb_dir, snap_dir, result_dir, model_dir)
 
     # Initialize model
     log(f"Initializing <{model_name}> model")
@@ -71,7 +72,8 @@ if __name__ == '__main__':
         # Learning rate scheduler
         scheduler=WarmupCosineSchedule,
         scheduler_config={'interval': 'step'},
-        scheduler_params={'warmup_steps': 3*3e2, 'total_steps': 1e5},
+        #scheduler_params={'warmup_steps': 3*3e2, 'total_steps': 1e5},
+        scheduler_params={'warmup_steps': 0, 'total_steps': 1e5},
 
         # Inference method
         inference=val_inference,
@@ -108,7 +110,7 @@ if __name__ == '__main__':
         callbacks=[
             LearningRateMonitor(logging_interval="step"),
             PrintTableMetricsCallback(),
-            TakeSnapshot(epochs=(1, 24, 49), save_dir=snap_dir)
+            #TakeSnapshot(epochs=(1, 24, 49), save_dir=snap_dir)
         ],
     )
 
@@ -124,8 +126,7 @@ if __name__ == '__main__':
     torch.cuda.empty_cache()
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     log("Evaluating model")
-    trainer.test(model=model,
-                 datamodule=brats)
+    trainer.test()
     results = model.test_results
 
     # Adding model parameters
@@ -133,10 +134,10 @@ if __name__ == '__main__':
         macs, params = get_model_complexity_info(model=model, input_res=(4, 128, 128, 128), as_strings=True,
                                                  print_per_layer_stat=True, verbose=False)
 
-    eval = {'results': results}
-    eval['n_param'] = model.get_n_parameters()
-    eval['flops_count'] = macs
-    eval['params'] = params
+    eval = {'results': results,
+            'n_param': model.get_n_parameters(),
+            'flops_count': macs,
+            'params': params}
 
     # Save test results
     np.save(file=join(result_dir, f'{model_name}_v{version}.npy'), arr=results)
