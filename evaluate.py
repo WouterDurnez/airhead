@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     # Set data directory
     train_dir = join(hlp.DATA_DIR, 'MICCAI_BraTS2020_TrainingData')
-    tb_dir = join(hlp.LOG_DIR, 'tb_logs', model_name)
+    tb_dir = join(hlp.LOG_DIR, 'tb_logs')
     snap_dir = join(hlp.LOG_DIR, 'snapshots', model_name)
     result_dir = join(hlp.LOG_DIR, 'results', model_name)
     set_dir(train_dir, tb_dir, snap_dir, result_dir)

@@ -57,7 +57,7 @@ def show_subject(sample:dict, axis:int = 0, slice: int = 100):
         ax[1, index].imshow(msk, alpha=.7, cmap=cmap_mask)
         # Bottom row with predicted masks
         if p:
-            #ax[2, index].imshow(img[index, ...], cmap='gray')
+            ax[2, index].imshow(img[index, ...], cmap='gray')
             ax[2, index].imshow(pre, alpha=.7, cmap=cmap_mask)
 
     plt.setp(ax, xticks=[], xticklabels=[], yticks=[], yticklabels=[])
@@ -96,8 +96,8 @@ if __name__ == '__main__':
     prediction = sitk.ReadImage(join(pred_dir, model_name, file_name))
     prediction = sitk.GetArrayFromImage(prediction)
     prediction = np.sum(prediction, axis=0)
-    sample['prediction'] = prediction
+    sample['prediction'] = torch.tensor(prediction)
 
     # Plot
-    show_subject(sample=sample, slice=30)
+    show_subject(sample=sample, slice=100)
 

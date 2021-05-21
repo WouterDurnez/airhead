@@ -17,7 +17,7 @@ from monai.transforms import Compose
 from torch import optim
 
 import utils.helper as hlp
-from data_module import BraTSDataModule
+from training.data_module import BraTSDataModule
 from models.unet import UNet
 from models.unet_lightning import UNetLightning
 from training.losses import *
@@ -50,7 +50,7 @@ def val_inference(input: torch.Tensor, model: nn.Module):
     # If it's the right type of model, containing our 'head' parameter,
     # check if the head is there, otherwise add sigmoid as posttransform
     if hasattr(model, 'head'):
-        if not model.head:
+        if model.head is None:
             post_trans_list.insert(0, Activations(sigmoid=True))
 
     # Compose and apply
@@ -83,7 +83,7 @@ def test_inference(input: torch.Tensor, model: nn.Module):
     # If it's the right type of model, containing our 'head' parameter,
     # check if the head is there, otherwise add sigmoid as posttransform
     if hasattr(model, 'head'):
-        if not model.head:
+        if model.head is None:
             post_trans_list.insert(0, Activations(sigmoid=True))
 
     # Compose and apply
@@ -142,7 +142,7 @@ if __name__ == '__main__':
                  hd_metric, hd_et, hd_tc, hd_wt],
 
         # Optimizer
-        optimizer=optim.AdamW,  # TODO: Why AdamW?
+        optimizer=optim.AdamW,
         optimizer_params={'lr': 1e-4, 'weight_decay': 1e-2},
 
         # Learning rate scheduler
@@ -168,10 +168,10 @@ if __name__ == '__main__':
     brats.setup('visualize')
 
     # Predict all samples
-    for sample in tqdm(brats.visualization_set, f"Predicting samples using {model_name} model"):
+    '''for sample in tqdm(brats.visualization_set, f"Predicting samples using {model_name} model"):
 
         with torch.no_grad():
             test = predict(model=model, sample=sample, model_name=model_name, device=device, write_dir=write_dir).detach()
 
         test = sitk.GetImageFromArray(test.cpu().numpy())
-        sitk.WriteImage(image=test, fileName=join(write_dir, f'pred_{sample["id"]}.nii.gz'))
+        sitk.WriteImage(image=test, fileName=join(write_dir, f'pred_{sample["id"]}.nii.gz'))'''
