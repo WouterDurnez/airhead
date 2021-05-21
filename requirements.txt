@@ -16,3 +16,4 @@ ptflops
 tensornetwork
 seaborn
 colorama
+opt_einsum
