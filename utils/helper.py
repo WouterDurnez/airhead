@@ -28,7 +28,7 @@ def set_params(verbosity: int = None, timestamped: bool = None, data_dir: str = 
     set_dir(DATA_DIR, LOG_DIR)
 
     VERBOSITY = verbosity if verbosity else VERBOSITY
-    TIMESTAMPED = timestamped if timestamped else TIMESTAMPED
+    TIMESTAMPED = timestamped if timestamped is not None else TIMESTAMPED
     DATA_DIR = data_dir if data_dir else DATA_DIR
     LOG_DIR = log_dir if log_dir else LOG_DIR
 
@@ -59,12 +59,14 @@ def hi(title=None, **params):
         set_params(**params)
 
     log(f"VERBOSITY is set to {VERBOSITY}", verbosity=1, timestamped=False, color='green')
+    log(f"TIMESTAMPED is set to {TIMESTAMPED}", verbosity=1, timestamped=False, color='green')
     log(f"DATA_DIR is now set to {os.path.abspath(DATA_DIR)}", timestamped=False, verbosity=1, color='green')
     log(f"LOG_DIR is set to {os.path.abspath(LOG_DIR)}", timestamped=False, verbosity=1, color='green')
     print()
 
     # Set directories
-    set_dir(DATA_DIR, LOG_DIR)
+    if not os.path.exists(DATA_DIR) or not os.path.exists(LOG_DIR):
+         set_dir(DATA_DIR, LOG_DIR)
 
     # Set seed
     seed_everything(616, workers=True)
@@ -86,7 +88,7 @@ def whatsgoingon(layer: Callable, input: Tensor):
 
 
 # Fancy print
-def log(*message, verbosity=3, timestamped=TIMESTAMPED, sep="", title=False, color=None):
+def log(*message, verbosity=3, sep="", timestamped=None, title=False, color=None):
     """
     Print wrapper that adds timestamp, and can be used to toggle levels of logging info.
 
@@ -128,10 +130,11 @@ def log(*message, verbosity=3, timestamped=TIMESTAMPED, sep="", title=False, col
 
         # Print regular
         else:
+            ts = timestamped if timestamped is not None else TIMESTAMPED
             t = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
             if color:
                 print(color, end='')
-            print((str(t) + (" - " if sep == "" else "-")) if timestamped else "", *message, Style.RESET_ALL, sep=sep)
+            print((str(t) + (" - " if sep == "" else "-")) if ts else "", *message, Style.RESET_ALL, sep=sep)
 
     return
 
