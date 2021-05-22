@@ -7,9 +7,9 @@
 """
 Lightweight convolutional layers
 
-* CANONICAL POLYADIC FORM
-* TODO: Tensor train
-* TODO: Tucker
+ * CANONICAL POLYADIC FORMAT
+ * TUCKER FORMAT
+ * TENSOR TRAIN FORMAT
 """
 
 import math
@@ -28,17 +28,17 @@ pp = PrettyPrinter(4)
 
 
 ####################
-# Helper functions # TODO: move these to utils
+# Helper functions #
 ####################
 
-def get_patches(input: torch.Tensor, kernel_dim: int = 3, stride: int = 1, padding: int = 1):
+def get_patches(input: torch.Tensor, kernel_dim: int = 3, stride: int = 1, padding: int = 1, value:int = 0):
     """
     Take input tensor and return unfolded patch Tensor
     """
 
     # First add padding if requested
     if padding:
-        input = F.pad(input=input, pad=(padding,) * 6, mode='constant', value=0)
+        input = F.pad(input=input, pad=(padding,) * 6, mode='constant', value=value)
 
     # Unfold across three dimensions to get patches
     patches = input.unfold(2, kernel_dim, stride).unfold(3, kernel_dim, stride).unfold(4, kernel_dim, stride)
@@ -107,7 +107,7 @@ class LowRankConv3D(nn.Module):
         * Tucker format
         """
 
-        types = ['cpd', 'canonical', 'tucker', 'train', 'tensor-train']
+        types = ['cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt']
         assert self.tensor_net_type in types, f"Choose a valid tensor network {types}"
 
         assert 'rank' in self.tensor_net_args, f"We need to know the `rank` as an argument."
@@ -133,9 +133,9 @@ class LowRankConv3D(nn.Module):
         ##################################################
         if self.tensor_net_type in ['canonical', 'cpd']:
 
-            assert isinstance(self.rank, int), 'For CPD, pass an integer for the rank.'
+            log(f'Creating CPD tensor network [rank = {self.rank}].', verbosity=1, color='magenta')
 
-            log('Creating CPD tensor network.', color='green')
+            assert isinstance(self.rank, int), 'For CPD, pass an integer for the rank.'
 
             """
             For the CPD format, we need 5 factor matrices: 
@@ -163,21 +163,13 @@ class LowRankConv3D(nn.Module):
                 "legs": ['r', '-c_out']  # <-- output channels becomes dangling edge after contraction
             }
 
-            # Collect output edges
-            output_edges = ['-b', '-c_out', '-h', '-w', '-d']
-            # output_edges = [leg for node in nodes for legs in node['legs'] for leg in legs if leg.startswith('-')]
-
-            '''print('NODES')
-            pp.pprint(nodes)'''
-
-            return nodes, output_edges
-
-
         #################
         # TUCKER FORMAT #
         #################
 
         elif self.tensor_net_type in ['tucker']:
+
+            log(f'Creating Tucker tensor network [rank(s) = {self.rank}].', verbosity=1, color='magenta')
 
             assert len(self.rank) == 5, 'For Tucker format, pass 5 rank integers.'
 
@@ -197,7 +189,7 @@ class LowRankConv3D(nn.Module):
                 'legs': ['r1','r2','r3','r4','r5']
             }
 
-            # First kernel factor matrices (U_kh, U_kd, U_kw)
+            # Now add kernel factor matrices (U_kh, U_kd, U_kw)
             for kernel_dim, rank_leg, rank in [('k_h','r2', self.r2),
                                                  ('k_w','r3', self.r3),
                                                  ('k_d', 'r4', self.r4)]:
@@ -207,7 +199,7 @@ class LowRankConv3D(nn.Module):
                     "legs": [kernel_dim, rank_leg]
                 }
 
-            # Now factor matrices for input and output channels
+            # Finally, add factor matrices for input and output channels
             nodes['U_c_in'] = {
                 "tensor": Tensor(self.in_channels, self.r1),
                 "shape": (self.in_channels, self.r1),
@@ -219,15 +211,66 @@ class LowRankConv3D(nn.Module):
                 "legs": ['r5', '-c_out']  # <-- output channels becomes dangling edge after contraction
             }
 
-            # Collect output edges
-            output_edges = ['-b', '-c_out', '-h', '-w', '-d']
-            # output_edges = [leg for node in nodes for legs in node['legs'] for leg in legs if leg.startswith('-')]
+        #######################
+        # TENSOR TRAIN FORMAT #
+        #######################
 
-            '''print('NODES')
-            pp.pprint(nodes)'''
+        elif self.tensor_net_type in ['train', 'tensor-train', 'tt']:
 
-            return nodes, output_edges
+            log(f'Creating Tensor Train network [rank(s) = {self.rank}].', verbosity=1, color='magenta')
 
+            assert len(self.rank) == 4, 'For tensor train format, pass 5 rank integers.'
+
+            self.r1, self.r2, self.r3, self.r4 = self.tensor_net_args['rank']
+
+            """
+            For the TT format, we need 5 nodes:
+             * 1 3rd-order tensor node for each of the kernel dimensions: U_k_h, U_k_w, U_kd,
+             * 1 factor matrix for the input channels, 1 for the output channels: U_c_in and U_c_out
+             
+              O - r1 - O - r2 - O - r3 - O - r4 - O
+              |        |        |        |        |
+             c_in     k_h      k_w      k_d      c_out
+            """
+
+            # First kernel factor matrices (U_kh, U_kd, U_kw)
+            nodes['U_k_h'] = {
+                'tensor': Tensor(self.r1, self.kernel_dim, self.r2),
+                'shape': (self.r1, self.kernel_dim, self.r2),
+                'legs': ['r1','k_h','r2']
+            }
+            nodes['U_k_w'] = {
+                'tensor': Tensor(self.r2, self.kernel_dim, self.r3),
+                'shape': (self.r2, self.kernel_dim, self.r3),
+                'legs': ['r2','k_w','r3']
+            }
+            nodes['U_k_d'] = {
+                'tensor': Tensor(self.r3, self.kernel_dim, self.r4),
+                'shape': (self.r3, self.kernel_dim, self.r4),
+                'legs': ['r3','k_d','r4']
+            }
+
+            # Now factor matrices for input and output channels
+            nodes['U_c_in'] = {
+                "tensor": Tensor(self.in_channels, self.r1),
+                "shape": (self.in_channels, self.r1),
+                "legs": ['c_in', 'r1']
+            }
+            nodes['U_c_out'] = {
+                "tensor": Tensor(self.r4, self.out_channels),
+                "shape": (self.r4, self.out_channels),
+                "legs": ['r4', '-c_out']  # <-- output channels becomes dangling edge after contraction
+            }
+
+
+        # Add output edges
+        output_edges = ['-b', '-c_out', '-h', '-w', '-d']
+        # output_edges = [leg for node in nodes for legs in node['legs'] for leg in legs if leg.startswith('-')]
+
+        '''print('NODES')
+        pp.pprint(nodes)'''
+
+        return nodes, output_edges
 
     def get_contraction(self):
         """ Get optimal contraction expression for our tensor network"""
@@ -323,11 +366,18 @@ if __name__ == '__main__':
                                kernel_dim=kernel_dim, padding=1, tensor_net_type='tucker', tensor_net_args={'rank': (23,)*5})
     layer_tucker.to(device)
 
+    # TT layer
+    layer_tt = LowRankConv3D(batch_size=1, in_channels=in_channels, out_channels=out_channels,
+                               kernel_dim=kernel_dim, padding=1, tensor_net_type='train', tensor_net_args={'rank': (23,)*4})
+    layer_tt.to(device)
+
     # Sample output
     classic_output = layer_classic(image)
     canon_output = layer_canon(image)
     tucker_output = layer_tucker(image)
+    tt_output = layer_tt(image)
 
-    assert canon_output.size() == classic_output.size(), "Something went wrong, output shapes don't match!"
-    assert tucker_output.size() == classic_output.size(), "Something went wrong, output shapes don't match!"
+    assert canon_output.size() == classic_output.size(), "Something went wrong with CPD format, output shapes don't match!"
+    assert tucker_output.size() == classic_output.size(), "Something went wrong with Tucker format, output shapes don't match!"
+    assert tucker_output.size() == classic_output.size(), "Something went wrong with TT format, output shapes don't match!"
 
