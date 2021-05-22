@@ -25,9 +25,11 @@ import torch.nn.functional as F
 from torch import Tensor
 
 from utils.helper import set_params
-from utils.helper import log
+from utils.helper import log, hi
 
 pp = PrettyPrinter(4)
+
+from models.unet import DoubleConv
 
 
 ####################
@@ -56,12 +58,11 @@ def get_patches(input: torch.Tensor, kernel_dim: int = 3, stride: int = 1, paddi
 class LowRankConv3D(nn.Module):
 
     def __init__(self,
-                 batch_size: int,
                  in_channels: int,
                  out_channels: int,
                  tensor_net_type: str,
                  tensor_net_args: dict,
-                 kernel_dim: int = 3,
+                 kernel_size: int = 3,
                  stride: int = 1,
                  padding: int = 1,
                  bias: bool = True,
@@ -70,10 +71,9 @@ class LowRankConv3D(nn.Module):
         super().__init__()
 
         # Initializing attributes
-        self.batch_size = batch_size
         self.in_channels = in_channels
         self.out_channels = out_channels
-        self.kernel_dim = kernel_dim
+        self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
         self.bias = bias
@@ -124,7 +124,7 @@ class LowRankConv3D(nn.Module):
             "tensor": None,
             "shape": (1, self.in_channels,  # <-- (batch size, input channels,
                       1, 1, 1,  # <--  image height, width, depth,
-                      self.kernel_dim, self.kernel_dim, self.kernel_dim),  # <--  kernel height, widht, depth)
+                      self.kernel_size, self.kernel_size, self.kernel_size),  # <--  kernel height, widht, depth)
             "legs": ['-b',
                      'c_in',
                      '-h', '-w', '-d',
@@ -134,6 +134,7 @@ class LowRankConv3D(nn.Module):
         ##################################################
         # CANONICAL POLYADIC TENSOR DECOMPOSITION FORMAT #
         ##################################################
+
         if self.tensor_net_type in ['canonical', 'cpd']:
 
             log(f'Creating CPD tensor network [rank = {self.rank}].', verbosity=1, color='magenta')
@@ -157,8 +158,8 @@ class LowRankConv3D(nn.Module):
             # First kernel factor matrices (U_kh, U_kd, U_kw)
             for name in ['k_h', 'k_w', 'k_d']:
                 nodes[f'U_{name}'] = {
-                    "tensor": Tensor(self.kernel_dim, self.rank),
-                    "shape": (self.kernel_dim, self.rank),
+                    "tensor": Tensor(self.kernel_size, self.rank),
+                    "shape": (self.kernel_size, self.rank),
                     "legs": [name, 'r']
                 }
 
@@ -214,8 +215,8 @@ class LowRankConv3D(nn.Module):
                                                ('k_w', 'r3', self.r3),
                                                ('k_d', 'r4', self.r4)]:
                 nodes[f'U_{kernel_dim}'] = {
-                    "tensor": Tensor(self.kernel_dim, rank),
-                    "shape": (self.kernel_dim, rank),
+                    "tensor": Tensor(self.kernel_size, rank),
+                    "shape": (self.kernel_size, rank),
                     "legs": [kernel_dim, rank_leg]
                 }
 
@@ -255,18 +256,18 @@ class LowRankConv3D(nn.Module):
 
             # First kernel factor matrices (U_kh, U_kd, U_kw)
             nodes['U_k_h'] = {
-                'tensor': Tensor(self.r1, self.kernel_dim, self.r2),
-                'shape': (self.r1, self.kernel_dim, self.r2),
+                'tensor': Tensor(self.r1, self.kernel_size, self.r2),
+                'shape': (self.r1, self.kernel_size, self.r2),
                 'legs': ['r1', 'k_h', 'r2']
             }
             nodes['U_k_w'] = {
-                'tensor': Tensor(self.r2, self.kernel_dim, self.r3),
-                'shape': (self.r2, self.kernel_dim, self.r3),
+                'tensor': Tensor(self.r2, self.kernel_size, self.r3),
+                'shape': (self.r2, self.kernel_size, self.r3),
                 'legs': ['r2', 'k_w', 'r3']
             }
             nodes['U_k_d'] = {
-                'tensor': Tensor(self.r3, self.kernel_dim, self.r4),
-                'shape': (self.r3, self.kernel_dim, self.r4),
+                'tensor': Tensor(self.r3, self.kernel_size, self.r4),
+                'shape': (self.r3, self.kernel_size, self.r4),
                 'legs': ['r3', 'k_d', 'r4']
             }
 
@@ -335,7 +336,7 @@ class LowRankConv3D(nn.Module):
     def forward(self, input: Tensor):
 
         # First, get patches
-        patches = get_patches(input=input, kernel_dim=kernel_dim, stride=stride, padding=1)
+        patches = get_patches(input=input, kernel_dim=self.kernel_size, stride=self.stride, padding=self.padding)
 
         # Now get weights, which should be attributes of the layer (if registered correctly)
         # Obviously don't count the input tensor
@@ -351,9 +352,76 @@ class LowRankConv3D(nn.Module):
         return output
 
 
+# Double convolution block for low rank layers
+class LowRankDoubleConv(nn.Module):
+
+    def __init__(
+            self,
+            in_channels,
+            out_channels,
+            num_groups=8,
+            strides=(2, 1),
+            activation=nn.LeakyReLU(inplace=True),
+            tensor_net_type='cpd',
+            tensor_net_args={'rank': 23},
+            conv_par=None,
+            __name__='low_rank_double_conv',
+    ):
+        super().__init__()
+        self.__name__ = __name__
+
+        # Initialize convolution parameters
+        conv_par = conv_par if conv_par else {}
+
+        # Set parameters (if not given!)
+        conv_par.setdefault('kernel_size', 3)
+        conv_par.setdefault('padding', 1)
+
+        # Define inner block architecture
+        self.block = nn.Sequential(
+
+            # Lightweight convolutional layer
+            LowRankConv3D(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                stride=strides[0],
+                tensor_net_type=tensor_net_type,
+                tensor_net_args=tensor_net_args,
+                **conv_par
+            ),
+
+            # Normalization layer (default minibatch of 8 instances)
+            nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
+
+            # Activation layer
+            activation,
+
+            # Lightweight convolutional layer
+            LowRankConv3D(
+                in_channels=out_channels,
+                out_channels=out_channels,
+                stride=strides[1],
+                tensor_net_type=tensor_net_type,
+                tensor_net_args=tensor_net_args,
+                **conv_par
+            ),
+
+            # Normalization layer (default minibatch of 8 instances)
+            nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
+
+            # Activation layer
+            activation
+        )
+
+    # Forward function (backward propagation is added automatically)
+    def forward(self, input):
+        return self.block(input)
+
+
 if __name__ == '__main__':
     # Console parameters
-    set_params(verbosity=3, timestamped=False)
+    # set_params(verbosity=3, timestamped=False)
+    hi('Lightweight layer sanity check', verbosity=3, timestamped=True)
 
     # Quick test (currently no cuda support on my end)
     # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -362,10 +430,10 @@ if __name__ == '__main__':
     # Sanity check: do dimensions make sense? Let's 'benchmark' a classic Conv3D layer
     batch_size = 1
     in_channels = 12
-    out_channels = 12
+    out_channels = 16
     kernel_dim = 3
     stride = 1
-    dim = 12
+    dim = 16
 
     # Test image
     image = torch.rand(1, in_channels, dim, dim, dim)
@@ -376,19 +444,19 @@ if __name__ == '__main__':
     layer_classic.to(device)
 
     # Canonical layer
-    layer_canon = LowRankConv3D(batch_size=1, in_channels=in_channels, out_channels=out_channels,
-                                kernel_dim=kernel_dim, padding=1, tensor_net_type='cpd', tensor_net_args={'rank': 23})
+    layer_canon = LowRankConv3D(in_channels=in_channels, out_channels=out_channels,
+                                kernel_size=kernel_dim, padding=1, tensor_net_type='cpd', tensor_net_args={'rank': 23})
     layer_classic.to(device)
 
     # Tucker layer
-    layer_tucker = LowRankConv3D(batch_size=1, in_channels=in_channels, out_channels=out_channels,
-                                 kernel_dim=kernel_dim, padding=1, tensor_net_type='tucker',
+    layer_tucker = LowRankConv3D(in_channels=in_channels, out_channels=out_channels,
+                                 kernel_size=kernel_dim, padding=1, tensor_net_type='tucker',
                                  tensor_net_args={'rank': (23,) * 5})
     layer_tucker.to(device)
 
     # TT layer
-    layer_tt = LowRankConv3D(batch_size=1, in_channels=in_channels, out_channels=out_channels,
-                             kernel_dim=kernel_dim, padding=1, tensor_net_type='train',
+    layer_tt = LowRankConv3D(in_channels=in_channels, out_channels=out_channels,
+                             kernel_size=kernel_dim, padding=1, tensor_net_type='train',
                              tensor_net_args={'rank': (23,) * 4})
     layer_tt.to(device)
 
@@ -401,3 +469,11 @@ if __name__ == '__main__':
     assert canon_output.size() == classic_output.size(), "Something went wrong with CPD format, output shapes don't match!"
     assert tucker_output.size() == classic_output.size(), "Something went wrong with Tucker format, output shapes don't match!"
     assert tt_output.size() == classic_output.size(), "Something went wrong with TT format, output shapes don't match!"
+
+    # Double conv test
+    double_conv_classic = DoubleConv(in_channels=in_channels,out_channels=out_channels)
+    double_conv_classic_output = double_conv_classic(image)
+    double_conv_cpd = LowRankDoubleConv(in_channels=in_channels, out_channels=out_channels, num_groups=8, )
+    double_conv_cpd_output = double_conv_cpd(image)
+
+    assert double_conv_cpd_output.size() == double_conv_classic_output.size(), "Something went wrong with double conv CPD, output shapes don't match!"
