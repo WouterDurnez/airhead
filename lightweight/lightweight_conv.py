@@ -10,6 +10,9 @@ Lightweight convolutional layers
  * CANONICAL POLYADIC FORMAT
  * TUCKER FORMAT
  * TENSOR TRAIN FORMAT
+
+TODO: Add compression rate! But first, figure out how to handle the different ranks in TT and Tucker --> all the same valuee?
+
 """
 
 import math
@@ -31,7 +34,7 @@ pp = PrettyPrinter(4)
 # Helper functions #
 ####################
 
-def get_patches(input: torch.Tensor, kernel_dim: int = 3, stride: int = 1, padding: int = 1, value:int = 0):
+def get_patches(input: torch.Tensor, kernel_dim: int = 3, stride: int = 1, padding: int = 1, value: int = 0):
     """
     Take input tensor and return unfolded patch Tensor
     """
@@ -62,7 +65,7 @@ class LowRankConv3D(nn.Module):
                  stride: int = 1,
                  padding: int = 1,
                  bias: bool = True,
-):
+                 ):
 
         super().__init__()
 
@@ -76,6 +79,12 @@ class LowRankConv3D(nn.Module):
         self.bias = bias
         self.tensor_net_type = tensor_net_type
         self.tensor_net_args = tensor_net_args
+
+        types = ['cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt']
+        assert self.tensor_net_type in types, f"Choose a valid tensor network {types}"
+
+        assert 'rank' in self.tensor_net_args, f"Please pass the `rank`."
+        self.rank = self.tensor_net_args['rank']
 
         ###########################
         # Building tensor network #
@@ -107,21 +116,15 @@ class LowRankConv3D(nn.Module):
         * Tucker format
         """
 
-        types = ['cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt']
-        assert self.tensor_net_type in types, f"Choose a valid tensor network {types}"
-
-        assert 'rank' in self.tensor_net_args, f"We need to know the `rank` as an argument."
-        self.rank = self.tensor_net_args['rank']
-
         # Store tensor network nodes here
         nodes = {}
 
         # We always need unfolded input
         nodes['input'] = {
             "tensor": None,
-            "shape": (1, self.in_channels,                                  # <-- (batch size, input channels,
-                      1, 1, 1,                                              # <--  image height, width, depth,
-                      self.kernel_dim, self.kernel_dim, self.kernel_dim),   # <--  kernel height, widht, depth)
+            "shape": (1, self.in_channels,  # <-- (batch size, input channels,
+                      1, 1, 1,  # <--  image height, width, depth,
+                      self.kernel_dim, self.kernel_dim, self.kernel_dim),  # <--  kernel height, widht, depth)
             "legs": ['-b',
                      'c_in',
                      '-h', '-w', '-d',
@@ -141,6 +144,14 @@ class LowRankConv3D(nn.Module):
             For the CPD format, we need 5 factor matrices: 
              * 1 for each of the kernel dimensions: U_k_h, U_k_w, U_kd,
              * 1 for the input channels, 1 for the output channels: U_c_in and U_c_out
+             
+             c_in - O - 
+                        \
+              k_h - O - -\
+                           - O - c_out
+              k_w - O -- /
+                        /
+              k_d - O -
             """
 
             # First kernel factor matrices (U_kh, U_kd, U_kw)
@@ -180,19 +191,28 @@ class LowRankConv3D(nn.Module):
              * 1 factor matrix for each of the kernel dimensions: U_k_h, U_k_w, U_kd,
              * 1 factor matrix for the input channels, 1 for the output channels: U_c_in and U_c_out
              * 1 core tensor: G
+             
+             
+             c_in - O - 
+                        \
+              k_h - O - -\
+                           - O - O - c_out
+              k_w - O -- /
+                        /       (middle node = core tensor G)
+              k_d - O -
             """
 
             # Let's start with the core tensor
             nodes['G'] = {
                 'tensor': Tensor(self.r1, self.r2, self.r3, self.r4, self.r5),
                 'shape': (self.r1, self.r2, self.r3, self.r4, self.r5),
-                'legs': ['r1','r2','r3','r4','r5']
+                'legs': ['r1', 'r2', 'r3', 'r4', 'r5']
             }
 
             # Now add kernel factor matrices (U_kh, U_kd, U_kw)
-            for kernel_dim, rank_leg, rank in [('k_h','r2', self.r2),
-                                                 ('k_w','r3', self.r3),
-                                                 ('k_d', 'r4', self.r4)]:
+            for kernel_dim, rank_leg, rank in [('k_h', 'r2', self.r2),
+                                               ('k_w', 'r3', self.r3),
+                                               ('k_d', 'r4', self.r4)]:
                 nodes[f'U_{kernel_dim}'] = {
                     "tensor": Tensor(self.kernel_dim, rank),
                     "shape": (self.kernel_dim, rank),
@@ -237,17 +257,17 @@ class LowRankConv3D(nn.Module):
             nodes['U_k_h'] = {
                 'tensor': Tensor(self.r1, self.kernel_dim, self.r2),
                 'shape': (self.r1, self.kernel_dim, self.r2),
-                'legs': ['r1','k_h','r2']
+                'legs': ['r1', 'k_h', 'r2']
             }
             nodes['U_k_w'] = {
                 'tensor': Tensor(self.r2, self.kernel_dim, self.r3),
                 'shape': (self.r2, self.kernel_dim, self.r3),
-                'legs': ['r2','k_w','r3']
+                'legs': ['r2', 'k_w', 'r3']
             }
             nodes['U_k_d'] = {
                 'tensor': Tensor(self.r3, self.kernel_dim, self.r4),
                 'shape': (self.r3, self.kernel_dim, self.r4),
-                'legs': ['r3','k_d','r4']
+                'legs': ['r3', 'k_d', 'r4']
             }
 
             # Now factor matrices for input and output channels
@@ -261,7 +281,6 @@ class LowRankConv3D(nn.Module):
                 "shape": (self.r4, self.out_channels),
                 "legs": ['r4', '-c_out']  # <-- output channels becomes dangling edge after contraction
             }
-
 
         # Add output edges
         output_edges = ['-b', '-c_out', '-h', '-w', '-d']
@@ -363,12 +382,14 @@ if __name__ == '__main__':
 
     # Tucker layer
     layer_tucker = LowRankConv3D(batch_size=1, in_channels=in_channels, out_channels=out_channels,
-                               kernel_dim=kernel_dim, padding=1, tensor_net_type='tucker', tensor_net_args={'rank': (23,)*5})
+                                 kernel_dim=kernel_dim, padding=1, tensor_net_type='tucker',
+                                 tensor_net_args={'rank': (23,) * 5})
     layer_tucker.to(device)
 
     # TT layer
     layer_tt = LowRankConv3D(batch_size=1, in_channels=in_channels, out_channels=out_channels,
-                               kernel_dim=kernel_dim, padding=1, tensor_net_type='train', tensor_net_args={'rank': (23,)*4})
+                             kernel_dim=kernel_dim, padding=1, tensor_net_type='train',
+                             tensor_net_args={'rank': (23,) * 4})
     layer_tt.to(device)
 
     # Sample output
@@ -379,5 +400,4 @@ if __name__ == '__main__':
 
     assert canon_output.size() == classic_output.size(), "Something went wrong with CPD format, output shapes don't match!"
     assert tucker_output.size() == classic_output.size(), "Something went wrong with Tucker format, output shapes don't match!"
-    assert tucker_output.size() == classic_output.size(), "Something went wrong with TT format, output shapes don't match!"
-
+    assert tt_output.size() == classic_output.size(), "Something went wrong with TT format, output shapes don't match!"
