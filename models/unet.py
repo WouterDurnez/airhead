@@ -131,9 +131,9 @@ class UNet(nn.Module):
             out_channels,
             widths=(32, 64, 128, 256, 320),
             activation=nn.LeakyReLU(inplace=True),
-            conv_par=None,
+            double_conv=DoubleConv,
+            double_conv_params=None,
             downsample = 'strided_convolution',
-            #down_par=None,
             up_par=None,
             head=True
     ):
@@ -152,9 +152,9 @@ class UNet(nn.Module):
         ##############
 
         # Set default parameters for double convolution
-        conv_par = conv_par if conv_par else {}
-        conv_par.setdefault('kernel_size', 3)
-        conv_par.setdefault('padding', 1)
+        double_conv_params = double_conv_params if double_conv_params else {}
+        double_conv_params.setdefault('kernel_size', 3)
+        double_conv_params.setdefault('padding', 1)
 
         # Set default parameters for downsampling (max pooling)
         '''down_par = down_par if down_par else {}
@@ -176,15 +176,20 @@ class UNet(nn.Module):
         """
         5 segments composed of double convolution blocks, followed by strided convolutoin (downsampling)
         """
-        self.enc_1 = DoubleConv(self.in_channels, self.widths[0], strides=(1,1), activation=activation, conv_par=conv_par)
+        self.enc_1 = double_conv(in_channels=self.in_channels, out_channels=self.widths[0],
+                                strides=(1,1), activation=activation, conv_par=double_conv_params)
         #self.down_1 = downsample(channels=widths[0], down_par=down_par)
-        self.enc_2 = DoubleConv(self.widths[0], self.widths[1], activation=activation, conv_par=conv_par)
+        self.enc_2 = double_conv(in_channels=self.widths[0], out_channels=self.widths[1],
+                                activation=activation, conv_par=double_conv_params)
         #self.down_2 = downsample(channels=widths[1],down_par=down_par)
-        self.enc_3 = DoubleConv(self.widths[1], self.widths[2], activation=activation, conv_par=conv_par)
+        self.enc_3 = double_conv(in_channels=self.widths[1],out_channels=self.widths[2],
+                                activation=activation, conv_par=double_conv_params)
         #self.down_3 = downsample(channels=widths[2],down_par=down_par)
-        self.enc_4 = DoubleConv(self.widths[2], self.widths[3], activation=activation, conv_par=conv_par)
+        self.enc_4 = double_conv(in_channels=self.widths[2], out_channels=self.widths[3],
+                                activation=activation, conv_par=double_conv_params)
         #self.down_4 = downsample(channels=widths[3],down_par=down_par)
-        self.enc_5 = DoubleConv(self.widths[3], self.widths[4], activation=activation, conv_par=conv_par)
+        self.enc_5 = double_conv(in_channels=self.widths[3], out_channels=self.widths[4],
+                                activation=activation, conv_par=double_conv_params)
         #self.down_5 = downsample(channels=widths[4],down_par=down_par)
 
         # BRIDGE
@@ -195,15 +200,15 @@ class UNet(nn.Module):
         5 segments composed of transposed convolutions (upsampling) and double convolution blocks
         """
         self.up_1 = Upsample(self.widths[4], self.widths[4], up_par=up_par)
-        self.dec_1 = DoubleConv(2 * self.widths[4], self.widths[3], strides=(1,1), activation=activation, conv_par=conv_par)  # double the filters due to concatenation
+        self.dec_1 = double_conv(2 * self.widths[4], self.widths[3], strides=(1,1), activation=activation, conv_par=double_conv_params)  # double the filters due to concatenation
         self.up_2 = Upsample(self.widths[3], self.widths[3], up_par=up_par)
-        self.dec_2 = DoubleConv(2 * self.widths[3], self.widths[2], strides=(1,1), activation=activation, conv_par=conv_par)
+        self.dec_2 = double_conv(2 * self.widths[3], self.widths[2], strides=(1,1), activation=activation, conv_par=double_conv_params)
         self.up_3 = Upsample(self.widths[2], self.widths[2], up_par=up_par)
-        self.dec_3 = DoubleConv(2 * self.widths[2], self.widths[1], strides=(1,1), activation=activation, conv_par=conv_par)
+        self.dec_3 = double_conv(2 * self.widths[2], self.widths[1], strides=(1,1), activation=activation, conv_par=double_conv_params)
         self.up_4 = Upsample(self.widths[1], self.widths[1], up_par=up_par)
-        self.dec_4 = DoubleConv(2 * self.widths[1], self.widths[0], strides=(1,1), activation=activation, conv_par=conv_par)
+        self.dec_4 = double_conv(2 * self.widths[1], self.widths[0], strides=(1,1), activation=activation, conv_par=double_conv_params)
         self.up_5 = Upsample(self.widths[0], self.widths[0], up_par=up_par)
-        self.dec_5 = DoubleConv(2 * self.widths[0], self.widths[0], strides=(1,1), activation=activation, conv_par=conv_par)
+        self.dec_5 = double_conv(2 * self.widths[0], self.widths[0], strides=(1,1), activation=activation, conv_par=double_conv_params)
 
         # Output
         self.final_conv = nn.Conv3d(in_channels=self.widths[0], out_channels=out_channels, kernel_size=1)

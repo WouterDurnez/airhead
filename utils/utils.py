@@ -10,7 +10,8 @@ Various utilities
 
 import os
 import math
-
+from sympy.solvers import solve
+from sympy import Symbol
 from torch.optim.lr_scheduler import LambdaLR
 from pytorch_lightning.callbacks import Callback
 from utils.helper import log
@@ -97,3 +98,48 @@ class TakeSnapshot(Callback):
         optimizer = trainer.lr_schedulers[0]["scheduler"].optimizer
         for param_group in optimizer.param_groups:
             return param_group["lr"]
+
+
+#############################
+# Compression/rank tradeoff #
+#############################
+
+def get_rank(compression: int, tensor_net_type:str, in_channels: int, out_channels:int, kernel_size:int) -> int:
+
+    types = ['cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt']
+    assert tensor_net_type in types, f"Choose a valid tensor network {types}"
+
+    max_params = in_channels * out_channels * kernel_size**3
+
+    if tensor_net_type in ['cpd','canonical']:
+
+        ''''
+        cpd params:
+        r * (in_channels + out_channels + 3 * kernel_size)
+        
+        compression = max_params / cpd_params
+        '''
+
+        rank = max_params/(compression * (in_channels + out_channels + 3*kernel_size))
+        return int(rank)
+
+    if tensor_net_type in ['tucker']:
+
+        '''
+        tucker params (assuming all r the same):
+        (r**5) + (r * c_in) + (r * c_out) + (r * 3 * kernel_size)
+        
+        '''
+        r = Symbol('r')
+        return solve(max_params/(r**5 + r * (in_channels + out_channels + 3*kernel_size)) - compression,r)
+
+if __name__ == '__main__':
+
+    in_channels = 16
+    out_channels = 8
+    kernel_size = 3
+    comp = 10
+
+    rank_cpd = get_rank(compression=comp, tensor_net_type='cpd', in_channels=in_channels, out_channels=out_channels, kernel_size=3)
+
+    rank_tucker = get_rank(compression=comp, tensor_net_type='tucker', in_channels=in_channels, out_channels=out_channels, kernel_size=3)

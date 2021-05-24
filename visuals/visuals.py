@@ -17,6 +17,8 @@ import numpy as np
 import seaborn as sns
 import SimpleITK as sitk
 from os.path import join
+from training.inference import test_inference
+
 
 def show_subject(sample:dict, axis:int = 0, slice: int = 100):
 
@@ -72,7 +74,7 @@ if __name__ == '__main__':
     hlp.hi("Visualizing BraTS")
 
     model_name = 'unet_baseline'
-    version = 0
+    version = 3
 
     # Set data directory
     vis_dir = join(hlp.LOG_DIR, 'images', model_name)
@@ -85,19 +87,38 @@ if __name__ == '__main__':
                             num_workers=8,
                             batch_size=1,
                             validation_size=.2)
-    brats.setup(stage='visualize')
+    brats.setup()
 
     # Get an image
-    idx = 3  # High grade ganglioma 3, Low-grade ganglioma 319
+    idx = 34  # High grade ganglioma 3, Low-grade ganglioma 319
     sample = brats.visualization_set[idx]
 
     # Get prediction
     file_name = f'pred_{sample["id"]}.nii.gz'
-    prediction = sitk.ReadImage(join(pred_dir, model_name, file_name))
+    prediction = sitk.ReadImage(join(pred_dir, model_name, f'v{version}', file_name))
     prediction = sitk.GetArrayFromImage(prediction)
     prediction = np.sum(prediction, axis=0)
-    sample['prediction'] = torch.tensor(prediction)
+
+    # Swap labels TODO: CHECK THIS OUT, IT'S LIKELY WRONG
+    prediction_new = np.zeros(shape=prediction.shape)
+    for old, new in [(0,0),(1,3),(2,1),(3,1)]:
+        prediction_new[prediction == old] = new
+
+    # Crop foreground
+    start = sample['foreground_start_coord']
+    end = sample['foreground_end_coord']
+
+    prediction_new = prediction_new[start[0]:end[0],start[1]:end[1],start[2]:end[2]]
+
+
+
+    #prediction = prediction[0,...]
+    sample['prediction'] = torch.tensor(prediction_new)
+
 
     # Plot
     show_subject(sample=sample, slice=100)
 
+    '''class 1: ET (label 4) -- enhancing tumor
+    class 2: TC (label 4 + 1) -- tumor core = enhancing + non-enhancing + necrotic
+    class 3: WT: (label 4 + 1 + 2) -- whole tumor = tumor core + edema'''

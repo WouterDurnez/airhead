@@ -8,7 +8,7 @@ if __name__ == '__main__':
     hlp.hi('Analysis')
 
     model_name = 'unet_baseline'
-    version = 0
+    version = 3
 
     result_dir = join(hlp.LOG_DIR, 'results', model_name)
 
@@ -23,7 +23,14 @@ if __name__ == '__main__':
     hd_tc = []
     hd_wt = []
 
+    best = 0
+    id = None
+
     for res in results:
+
+        if res['test_dice_metric'] > best:
+            id = res['id']
+
         dice.append(res['test_dice_metric'])
         dice_et.append(res['test_dice_et'])
         dice_tc.append(res['test_dice_tc'])

@@ -17,3 +17,4 @@ tensornetwork
 seaborn
 colorama
 opt_einsum
+sympy

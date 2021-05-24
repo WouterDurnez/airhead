@@ -29,6 +29,7 @@ from utils import helper as hlp
 from utils.helper import log
 from utils.helper import set_dir
 from utils.utils import WarmupCosineSchedule, TakeSnapshot
+from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 
 pp = PrettyPrinter()
 
@@ -38,15 +39,15 @@ if __name__ == '__main__':
 
     # Name
     model_name = 'unet_baseline'
-    version = 1
+    version = 9
 
     # Set data directory
     data_dir = hlp.DATA_DIR
     tb_dir = join(hlp.LOG_DIR, 'tb_logs')
     snap_dir = join(hlp.LOG_DIR, 'snapshots', model_name)
     result_dir = join(hlp.LOG_DIR, 'results', model_name)
-    model_dir = join(hlp.LOG_DIR, 'models', model_name)
-    set_dir(data_dir, tb_dir, snap_dir, result_dir, model_dir)
+    #model_dir = join(hlp.LOG_DIR, 'models', model_name)
+    set_dir(data_dir, tb_dir, snap_dir, result_dir)
 
     # Initialize model
     log(f"Initializing <{model_name}> model")
@@ -66,14 +67,16 @@ if __name__ == '__main__':
                  hd_metric, hd_et, hd_tc, hd_wt],
 
         # Optimizer
-        optimizer=optim.AdamW,  # TODO: Why AdamW?
-        optimizer_params={'lr': 1e-4, 'weight_decay': 1e-2},
+        optimizer=optim.AdamW,
+        optimizer_params={'lr': 1e-4, 'weight_decay': 1e-5},
 
         # Learning rate scheduler
-        scheduler=WarmupCosineSchedule,
-        scheduler_config={'interval': 'step'},
+        #scheduler=WarmupCosineSchedule,
+        scheduler=LinearWarmupCosineAnnealingLR,
+        scheduler_config={'interval': 'epoch'},
         #scheduler_params={'warmup_steps': 3*3e2, 'total_steps': 1e5},
-        scheduler_params={'warmup_steps': 0, 'total_steps': 1e5},
+        #scheduler_params={'warmup_steps': 294*5, 'total_steps': 1e5},
+        scheduler_params={'warmup_epochs': 1, 'max_epochs':150},
 
         # Inference method
         inference=val_inference,
@@ -85,7 +88,7 @@ if __name__ == '__main__':
     )
 
     # Load checkpoint
-    # model.load_from_checkpoint(checkpoint_path=join(snap_dir,'epoch=1.ckpt'))
+    #model.load_from_checkpoint(checkpoint_path=join(snap_dir,f'final_{model_name}_v0.ckpt'))
 
     # Initialize data module
     log("Initializing data module")
@@ -102,10 +105,11 @@ if __name__ == '__main__':
     log("Initializing trainer")
     trainer = Trainer(
         max_steps=100000,
-        max_epochs=100,
+        max_epochs=150,
         logger=tb_logger,
         gpus=1,
         num_nodes=1,
+        deterministic=True,
         # distributed_backend='ddp',
         callbacks=[
             LearningRateMonitor(logging_interval="step"),
@@ -123,8 +127,8 @@ if __name__ == '__main__':
     trainer.save_checkpoint(join(snap_dir, f'final_{model_name}_v{version}.ckpt'))
 
     # Test
-    torch.cuda.empty_cache()
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    #torch.cuda.empty_cache()
+    #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     log("Evaluating model")
     trainer.test()
     results = model.test_results

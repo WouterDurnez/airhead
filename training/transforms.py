@@ -112,7 +112,7 @@ def get_train_transform():
     DATA PREPARATION (CTD)
     * normalize intensity ((X - mu)/sigma)
         -- zero remains zero
-         -- calculate mus and sigmas for channels separately (T1, T2, etc)
+        -- calculate mus and sigmas for channels separately (T1, T2, etc)
     * convert to tensor
     """
 
@@ -210,5 +210,5 @@ def get_vis_transform():
         CropForegroundd(keys=["input", "target"], source_key="input"),
         ToTensord(keys=["input", "target"]),
     ]
-    validation_transform = Compose(transforms)
-    return validation_transform
+    visualisation_transforms = Compose(transforms)
+    return visualisation_transforms

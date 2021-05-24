@@ -11,7 +11,7 @@ Lightweight convolutional layers
  * TUCKER FORMAT
  * TENSOR TRAIN FORMAT
 
-TODO: Add compression rate! But first, figure out how to handle the different ranks in TT and Tucker --> all the same valuee?
+TODO: Add compression rate! But first, figure out how to handle the different ranks in TT and Tucker --> all the same value?
 
 """
 
@@ -82,6 +82,8 @@ class LowRankConv3D(nn.Module):
 
         types = ['cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt']
         assert self.tensor_net_type in types, f"Choose a valid tensor network {types}"
+
+        self.__name__ = f'{self.tensor_net_type.upper()}_low_rank_conv'
 
         assert 'rank' in self.tensor_net_args, f"Please pass the `rank`."
         self.rank = self.tensor_net_args['rank']
@@ -194,13 +196,15 @@ class LowRankConv3D(nn.Module):
              * 1 core tensor: G
              
              
-             c_in - O - 
-                        \
-              k_h - O - -\
-                           - O - O - c_out
-              k_w - O -- /
-                        /       (middle node = core tensor G)
-              k_d - O -
+             c_in - O ---
+                          \
+              k_h - O ---  \
+                          \ |
+                            O - O - c_out
+                          / |           
+              k_w - O ---  /
+                          /       (middle node = core tensor G)
+              k_d - O ---
             """
 
             # Let's start with the core tensor
@@ -429,8 +433,8 @@ if __name__ == '__main__':
 
     # Sanity check: do dimensions make sense? Let's 'benchmark' a classic Conv3D layer
     batch_size = 1
-    in_channels = 12
-    out_channels = 16
+    in_channels = 4
+    out_channels = 32
     kernel_dim = 3
     stride = 1
     dim = 16

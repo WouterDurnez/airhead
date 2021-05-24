@@ -71,7 +71,7 @@ def test_inference(input: torch.Tensor, model: nn.Module):
 
     # Generate output using sliding window (sized 128^3)
     output = sliding_window_inference(
-        inputs=input, roi_size=(128, 128, 128), sw_batch_size=2, predictor=model,
+        inputs=input, roi_size=(128, 128, 128), sw_batch_size=1, predictor=model,
     )
 
     # Post transforms
@@ -120,8 +120,8 @@ if __name__ == '__main__':
 
     # Set parameters
     model_name = 'unet_baseline'
-    version = 0
-    write_dir = join(hlp.DATA_DIR, 'predictions', model_name)
+    version = 3
+    write_dir = join(hlp.DATA_DIR, 'predictions', model_name, f'v{version}')
     hlp.set_dir(write_dir)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -143,7 +143,7 @@ if __name__ == '__main__':
 
         # Optimizer
         optimizer=optim.AdamW,
-        optimizer_params={'lr': 1e-4, 'weight_decay': 1e-2},
+        optimizer_params={'lr': 1e-4, 'weight_decay': 1e-5},
 
         # Learning rate scheduler
         scheduler=WarmupCosineSchedule,
@@ -165,13 +165,13 @@ if __name__ == '__main__':
 
     # Predict a sample
     brats = BraTSDataModule(data_dir=join(hlp.DATA_DIR, "MICCAI_BraTS2020_TrainingData"), num_workers=2)
-    brats.setup('visualize')
+    brats.setup('test')
 
     # Predict all samples
-    '''for sample in tqdm(brats.visualization_set, f"Predicting samples using {model_name} model"):
+    for sample in tqdm(brats.test_set, f"Predicting samples using {model_name} model"):
 
         with torch.no_grad():
             test = predict(model=model, sample=sample, model_name=model_name, device=device, write_dir=write_dir).detach()
 
         test = sitk.GetImageFromArray(test.cpu().numpy())
-        sitk.WriteImage(image=test, fileName=join(write_dir, f'pred_{sample["id"]}.nii.gz'))'''
+        sitk.WriteImage(image=test, fileName=join(write_dir, f'pred_{sample["id"]}.nii.gz'))

@@ -14,7 +14,6 @@ from torch import optim
 from pytorch_lightning.core import LightningModule
 from time import time
 
-
 ####################################
 # Lightning wrapper for UNet model #
 ####################################
