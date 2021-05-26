@@ -19,7 +19,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch import optim
-
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from models.unet import UNet
 from models.unet_lightning import UNetLightning
 from training.data_module import BraTSDataModule
@@ -39,7 +39,7 @@ if __name__ == '__main__':
 
     # Name
     model_name = 'unet_baseline'
-    version = 9
+    version = 5
 
     # Set data directory
     data_dir = hlp.DATA_DIR
@@ -72,11 +72,12 @@ if __name__ == '__main__':
 
         # Learning rate scheduler
         #scheduler=WarmupCosineSchedule,
-        scheduler=LinearWarmupCosineAnnealingLR,
+        scheduler=CosineAnnealingWarmRestarts,
         scheduler_config={'interval': 'epoch'},
         #scheduler_params={'warmup_steps': 3*3e2, 'total_steps': 1e5},
         #scheduler_params={'warmup_steps': 294*5, 'total_steps': 1e5},
-        scheduler_params={'warmup_epochs': 1, 'max_epochs':150},
+        #scheduler_params={'warmup_epochs': 1, 'max_epochs':150},
+        scheduler_params={'T_0': 25},
 
         # Inference method
         inference=val_inference,
