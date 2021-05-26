@@ -14,7 +14,7 @@ from sympy.solvers import solve
 from sympy import Symbol
 from torch.optim.lr_scheduler import LambdaLR
 from pytorch_lightning.callbacks import Callback
-from utils.helper import log
+from helper import log
 
 #################
 # LR Schedulers #
@@ -104,17 +104,33 @@ class TakeSnapshot(Callback):
 # Compression/rank tradeoff #
 #############################
 
-def get_rank(compression: int, tensor_net_type:str, in_channels: int, out_channels:int, kernel_size:int) -> int:
+def get_tuning_var(compression: int, tensor_net_type:str, in_channels: int, out_channels:int, kernel_size:int = 3) -> int:
+    """
+    Given a compression rate, return the appropriate tuning parameter,
+    depending on the tensor network that is used for the low-rank convolution
+    :param compression: compression rate
+    :param tensor_net_type: tensor network type (cpd, tensor train or tucker)
+    :param in_channels: input channels
+    :param out_channels: output channels
+    :param kernel_size: kernel size (default 3)
+    :return:
+    """
 
+    # Make sure the right type of tensor network was passed
     types = ['cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt']
     assert tensor_net_type in types, f"Choose a valid tensor network {types}"
 
+    # Number of parameters for a full-rank convolution
     max_params = in_channels * out_channels * kernel_size**3
+
+    #######
+    # CPD #
+    #######
 
     if tensor_net_type in ['cpd','canonical']:
 
         ''''
-        cpd params:
+        cpd_params:
         r * (in_channels + out_channels + 3 * kernel_size)
         
         compression = max_params / cpd_params
@@ -123,23 +139,80 @@ def get_rank(compression: int, tensor_net_type:str, in_channels: int, out_channe
         rank = max_params/(compression * (in_channels + out_channels + 3*kernel_size))
         return int(rank)
 
+    ##########
+    # TUCKER #
+    ##########
+
     if tensor_net_type in ['tucker']:
 
         '''
-        tucker params (assuming all r the same):
-        (r**5) + (r * c_in) + (r * c_out) + (r * 3 * kernel_size)
+        tucker params:
+        ((C_in/S) * 3 * 3 * 3 * (C_out/S)) + 3 * (3*3)             + (input_channels**2/S) + (output_channels**2/S)
+        = core tensor shape                + 3 * kernel node shape + input node shape      + output node shape 
         
+        compression = max_params / tucker_params        
         '''
-        r = Symbol('r')
-        return solve(max_params/(r**5 + r * (in_channels + out_channels + 3*kernel_size)) - compression,r)
+        S = Symbol('S',real=True)
+        solutions = solve((max_params/((3**3*(in_channels/S)*(out_channels/S)) + 3**3 + ((in_channels**2)/S) + ((out_channels**2)/S))) - compression,S)
+
+        # Check for appropriate S values
+        evaluated_solutions = []
+        for s in solutions:
+            evaluated = s.evalf()
+            if evaluated > 0:
+                evaluated_solutions.append(evaluated)
+
+        # Check if unique positive, real solution
+        assert len(evaluated_solutions) == 1, 'Too many solutions!'
+
+        return evaluated_solutions[0]
+
+    ################
+    # TENSOR TRAIN #
+    ################
+
+    if tensor_net_type in ['tt','tensor-train','train']:
+        '''
+        tensor train params:
+        r * (in_channels + r*(3+3+3) + out_channels)
+        
+        compression = max_params / tt_params     
+        '''
+        r = Symbol('r', real=True)
+        solutions = solve(max_params/
+                          (r*(in_channels + 3*(3*r) + out_channels)) - compression,r)
+
+        # Check for appropriate S values
+        evaluated_solutions = []
+        for s in solutions:
+            evaluated = s.evalf()
+            if evaluated > 0:
+                evaluated_solutions.append(evaluated)
+
+        # Check if unique positive, real solution
+        assert len(evaluated_solutions) == 1, 'Too many solutions!'
+
+        return evaluated_solutions[0]
+
 
 if __name__ == '__main__':
 
-    in_channels = 16
+    in_channels = 500
     out_channels = 8
     kernel_size = 3
     comp = 10
 
-    rank_cpd = get_rank(compression=comp, tensor_net_type='cpd', in_channels=in_channels, out_channels=out_channels, kernel_size=3)
+    #tune_cpd = get_tuning_var(compression=comp, tensor_net_type='cpd', in_channels=in_channels, out_channels=out_channels, kernel_size=3)
 
-    rank_tucker = get_rank(compression=comp, tensor_net_type='tucker', in_channels=in_channels, out_channels=out_channels, kernel_size=3)
+    '''for comp in (5, 10, 50, 100):
+        for in_channels, out_channels in zip((4,32,32,64,64,128,128,256,256,320,320),
+                                             (32,32,64,64,128,128,256,256,320,320,320)):
+            tune_tucker = get_tuning_var(compression=comp, tensor_net_type='tucker', in_channels=in_channels, out_channels=out_channels, kernel_size=3)
+            print(f'comp {comp} - in {in_channels} - out {out_channels} --> S={tune_tucker}')'''
+
+    for comp in (5, 10, 50, 100):
+        for in_channels, out_channels in zip((4, 32, 32, 64, 64, 128, 128, 256, 256, 320, 320),
+                                             (32, 32, 64, 64, 128, 128, 256, 256, 320, 320, 320)):
+            tune_train = get_tuning_var(compression=comp, tensor_net_type='tt', in_channels=in_channels,
+                                         out_channels=out_channels, kernel_size=3)
+            print(f'comp {comp} - in {in_channels} - out {out_channels} --> R={tune_train}')
