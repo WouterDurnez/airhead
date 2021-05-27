@@ -5,7 +5,7 @@
 #
 
 """
-Lightning wrapper for model, to facilitate easy training
+Lightning wrapper for model, to facilitate training
 """
 
 import torch.nn.functional as F

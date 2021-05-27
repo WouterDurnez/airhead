@@ -193,7 +193,7 @@ class UNet(nn.Module):
         #self.down_5 = downsample(channels=widths[4],down_par=down_par)
 
         # BRIDGE
-        self.bridge = DoubleConv(self.widths[4], self.widths[4])
+        self.bridge = double_conv(self.widths[4], self.widths[4])
 
         # DECODER
         """
