@@ -10,9 +10,6 @@ Lightweight convolutional layers
  * CANONICAL POLYADIC FORMAT
  * TUCKER FORMAT
  * TENSOR TRAIN FORMAT
-
-TODO: Add compression rate! But first, figure out how to handle the different ranks in TT and Tucker --> all the same value?
-
 """
 
 import math
@@ -22,14 +19,15 @@ import opt_einsum as oe
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from ptflops import get_model_complexity_info
+from pthflops import count_ops
+from sympy import Symbol, solve
 from torch import Tensor
-
-from utils.helper import set_params
+from models.unet import UNet
+from models.unet import DoubleConv
 from utils.helper import log, hi
 
 pp = PrettyPrinter(4)
-
-from models.unet import DoubleConv
 
 
 ####################
@@ -58,10 +56,10 @@ def get_patches(input: torch.Tensor, kernel_dim: int = 3, stride: int = 1, paddi
 class LowRankConv3D(nn.Module):
 
     def __init__(self,
+                 compression: int,
                  in_channels: int,
                  out_channels: int,
                  tensor_net_type: str,
-                 tensor_net_args: dict,
                  kernel_size: int = 3,
                  stride: int = 1,
                  padding: int = 1,
@@ -71,6 +69,7 @@ class LowRankConv3D(nn.Module):
         super().__init__()
 
         # Initializing attributes
+        self.compression = compression
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel_size = kernel_size
@@ -78,25 +77,21 @@ class LowRankConv3D(nn.Module):
         self.padding = padding
         self.bias = bias
         self.tensor_net_type = tensor_net_type
-        self.tensor_net_args = tensor_net_args
 
         types = ['cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt']
         assert self.tensor_net_type in types, f"Choose a valid tensor network {types}"
 
-        self.__name__ = f'{self.tensor_net_type.upper()}_low_rank_conv'
-
-        assert 'rank' in self.tensor_net_args, f"Please pass the `rank`."
-        self.rank = self.tensor_net_args['rank']
+        self.__name__ = f'{self.tensor_net_type.lower()}_low_rank_conv'
 
         ###########################
         # Building tensor network #
         ###########################
 
         # Create tensor network
-        self.nodes, self.output_edges = self.make_tensor_network()
+        self.nodes, self.output_edges = self._make_tensor_network()
 
         # Register and initialize parameters
-        self.register_and_init()
+        self._register_and_init()
 
         # Add bias
         if bias:
@@ -105,12 +100,12 @@ class LowRankConv3D(nn.Module):
             self.register_parameter("bias", None)
 
         # Get contraction with optimal path
-        self.einsum_expression, self.path_info = self.get_contraction()
+        self.einsum_expression, self.path_info = self._get_contraction()
 
         # Save of flops (but this can also be done using ptflops, so watch out here to make a fair comparison)
         self.flops = self.path_info.opt_cost
 
-    def make_tensor_network(self):
+    def _make_tensor_network(self):
         """
         Create a tensor network as requested, given the type:
         * Canonical polyadic decomposition format
@@ -139,9 +134,10 @@ class LowRankConv3D(nn.Module):
 
         if self.tensor_net_type in ['canonical', 'cpd']:
 
-            log(f'Creating CPD tensor network [rank = {self.rank}].', verbosity=1, color='magenta')
+            log(f'Creating CPD tensor network [compression rate = {self.compression}].', verbosity=3, color='magenta')
 
-            assert isinstance(self.rank, int), 'For CPD, pass an integer for the rank.'
+            # First, obtain rank based on compression rate
+            self.rank = self._get_tuning_par()
 
             """
             For the CPD format, we need 5 factor matrices: 
@@ -183,11 +179,7 @@ class LowRankConv3D(nn.Module):
 
         elif self.tensor_net_type in ['tucker']:
 
-            log(f'Creating Tucker tensor network [rank(s) = {self.rank}].', verbosity=1, color='magenta')
-
-            assert len(self.rank) == 5, 'For Tucker format, pass 5 rank integers.'
-
-            self.r1, self.r2, self.r3, self.r4, self.r5 = self.tensor_net_args['rank']
+            log(f'Creating Tucker tensor network [compression rate = {self.compression}].', verbosity=3, color='magenta')
 
             """
             For the CPD format, we need 6 nodes: 5 factor matrices and a core tensor: 
@@ -206,6 +198,16 @@ class LowRankConv3D(nn.Module):
                           /       (middle node = core tensor G)
               k_d - O ---
             """
+
+            # We set shape of G (core tensor) to (r1, r2, r3, r4, r5) = (in_channels/S, 3, 3, 3, out_channels/s)
+            self.r2 = self.r3 = self.r4 = 3
+
+            # Get tuning parameter S
+            self.S = self._get_tuning_par()
+
+            # Get r1 and r5
+            self.r1 = round(self.in_channels / self.S) if round(self.in_channels / self.S) > 0 else 1
+            self.r5 = round(self.out_channels / self.S) if round(self.out_channels / self.S) > 0 else 1
 
             # Let's start with the core tensor
             nodes['G'] = {
@@ -242,11 +244,7 @@ class LowRankConv3D(nn.Module):
 
         elif self.tensor_net_type in ['train', 'tensor-train', 'tt']:
 
-            log(f'Creating Tensor Train network [rank(s) = {self.rank}].', verbosity=1, color='magenta')
-
-            assert len(self.rank) == 4, 'For tensor train format, pass 5 rank integers.'
-
-            self.r1, self.r2, self.r3, self.r4 = self.tensor_net_args['rank']
+            log(f'Creating Tensor Train network [compression rate = {self.compression}].', verbosity=3, color='magenta')
 
             """
             For the TT format, we need 5 nodes:
@@ -257,6 +255,10 @@ class LowRankConv3D(nn.Module):
               |        |        |        |        |
              c_in     k_h      k_w      k_d      c_out
             """
+
+            # We tune the bond dimensions (assumed equal across the 'train')
+            r = round(self._get_tuning_par()) if round(self._get_tuning_par()) > 0 else 1
+            self.r1 = self.r2 = self.r3 = self.r4 = r
 
             # First kernel factor matrices (U_kh, U_kd, U_kw)
             nodes['U_k_h'] = {
@@ -296,7 +298,7 @@ class LowRankConv3D(nn.Module):
 
         return nodes, output_edges
 
-    def get_contraction(self):
+    def _get_contraction(self):
         """ Get optimal contraction expression for our tensor network"""
 
         args = [self.nodes['input']['shape'], self.nodes['input']['legs']]
@@ -321,7 +323,7 @@ class LowRankConv3D(nn.Module):
 
         return expr, path_info
 
-    def register_and_init(self):
+    def _register_and_init(self):
         """ Register and initialize parameters"""
 
         # Go over all weight nodes
@@ -336,6 +338,91 @@ class LowRankConv3D(nn.Module):
 
                 # Initialize values
                 nn.init.kaiming_uniform_(v['tensor'], a=math.sqrt(5))
+
+    def _get_tuning_par(self) -> int:
+        """
+        Given a compression rate, return the appropriate tuning parameter,
+        depending on the tensor network that is used for the low-rank convolution
+        """
+
+        # Number of parameters for a full-rank convolution
+        max_params = self.in_channels * self.out_channels * self.kernel_size ** 3
+
+        #######
+        # CPD #
+        #######
+
+        if self.tensor_net_type in ['cpd', 'canonical']:
+            ''''
+            cpd_params:
+            r * (in_channels + out_channels + 3 * kernel_size)
+
+            compression = max_params / cpd_params
+            '''
+
+            rank = max_params / (self.compression * (self.in_channels + self.out_channels + 3 * self.kernel_size))
+            return round(rank) if round(rank) > 0 else 1
+
+        ##########
+        # TUCKER #
+        ##########
+
+        if self.tensor_net_type in ['tucker']:
+
+            '''
+            tucker params:
+            ((C_in/S) * 3 * 3 * 3 * (C_out/S)) + 3 * (3*3)             + (input_channels**2/S) + (output_channels**2/S)
+            = core tensor shape                + 3 * kernel node shape + input node shape      + output node shape 
+
+            compression = max_params / tucker_params        
+            '''
+
+            S = Symbol('S', real=True)
+            solutions = solve((max_params / (
+                    (3 ** 3 * (self.in_channels / S) * (self.out_channels / S)) + 3 ** 3 + (
+                    (self.in_channels ** 2) / S) + (
+                            (self.out_channels ** 2) / S))) - self.compression, S)
+
+            # Check for appropriate S values
+            evaluated_solutions = []
+            for s in solutions:
+                evaluated = s.evalf()
+                if evaluated > 0:
+                    evaluated_solutions.append(evaluated)
+
+            # Check if unique positive, real solution
+            assert len(evaluated_solutions) == 1, 'Too many solutions!'
+
+            return evaluated_solutions[0]
+
+        ################
+        # TENSOR TRAIN #
+        ################
+
+        if self.tensor_net_type in ['tt', 'tensor-train', 'train']:
+
+            '''
+            tensor train params:
+            r * (in_channels + r*(3+3+3) + out_channels)
+
+            compression = max_params / tt_params     
+            '''
+
+            r = Symbol('r', real=True)
+            solutions = solve(max_params /
+                              (r * (self.in_channels + 3 * (3 * r) + self.out_channels)) - self.compression, r)
+
+            # Check for appropriate S values
+            evaluated_solutions = []
+            for s in solutions:
+                evaluated = s.evalf()
+                if evaluated > 0:
+                    evaluated_solutions.append(evaluated)
+
+            # Check if unique positive, real solution
+            assert len(evaluated_solutions) == 1, 'Too many solutions!'
+
+            return evaluated_solutions[0]
 
     def forward(self, input: Tensor):
 
@@ -361,13 +448,13 @@ class LowRankDoubleConv(nn.Module):
 
     def __init__(
             self,
-            in_channels,
-            out_channels,
+            compression:int,
+            tensor_net_type:str,
+            in_channels:int,
+            out_channels:int,
             num_groups=8,
             strides=(2, 1),
             activation=nn.LeakyReLU(inplace=True),
-            tensor_net_type='cpd',
-            tensor_net_args={'rank': 23},
             conv_par=None,
             __name__='low_rank_double_conv',
     ):
@@ -386,11 +473,11 @@ class LowRankDoubleConv(nn.Module):
 
             # Lightweight convolutional layer
             LowRankConv3D(
+                compression=compression,
                 in_channels=in_channels,
                 out_channels=out_channels,
                 stride=strides[0],
                 tensor_net_type=tensor_net_type,
-                tensor_net_args=tensor_net_args,
                 **conv_par
             ),
 
@@ -402,11 +489,11 @@ class LowRankDoubleConv(nn.Module):
 
             # Lightweight convolutional layer
             LowRankConv3D(
+                compression=compression,
                 in_channels=out_channels,
                 out_channels=out_channels,
                 stride=strides[1],
                 tensor_net_type=tensor_net_type,
-                tensor_net_args=tensor_net_args,
                 **conv_par
             ),
 
@@ -434,10 +521,10 @@ if __name__ == '__main__':
     # Sanity check: do dimensions make sense? Let's 'benchmark' a classic Conv3D layer
     batch_size = 1
     in_channels = 4
-    out_channels = 32
+    out_channels = 64
     kernel_dim = 3
     stride = 1
-    dim = 16
+    dim = 64
 
     # Test image
     image = torch.rand(1, in_channels, dim, dim, dim)
@@ -447,21 +534,25 @@ if __name__ == '__main__':
     layer_classic = nn.Conv3d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_dim, padding=1)
     layer_classic.to(device)
 
+    # Low-rank layers
+    compression = 15
+
     # Canonical layer
     layer_canon = LowRankConv3D(in_channels=in_channels, out_channels=out_channels,
-                                kernel_size=kernel_dim, padding=1, tensor_net_type='cpd', tensor_net_args={'rank': 23})
+                                compression=compression,
+                                kernel_size=kernel_dim, padding=1, tensor_net_type='cpd')
     layer_classic.to(device)
 
     # Tucker layer
     layer_tucker = LowRankConv3D(in_channels=in_channels, out_channels=out_channels,
-                                 kernel_size=kernel_dim, padding=1, tensor_net_type='tucker',
-                                 tensor_net_args={'rank': (23,) * 5})
+                                 compression=compression,
+                                 kernel_size=kernel_dim, padding=1, tensor_net_type='tucker')
     layer_tucker.to(device)
 
     # TT layer
     layer_tt = LowRankConv3D(in_channels=in_channels, out_channels=out_channels,
-                             kernel_size=kernel_dim, padding=1, tensor_net_type='train',
-                             tensor_net_args={'rank': (23,) * 4})
+                             compression=compression,
+                             kernel_size=kernel_dim, padding=1, tensor_net_type='train')
     layer_tt.to(device)
 
     # Sample output
@@ -475,9 +566,20 @@ if __name__ == '__main__':
     assert tt_output.size() == classic_output.size(), "Something went wrong with TT format, output shapes don't match!"
 
     # Double conv test
-    double_conv_classic = DoubleConv(in_channels=in_channels,out_channels=out_channels)
+    double_conv_classic = DoubleConv(in_channels=in_channels, out_channels=out_channels)
     double_conv_classic_output = double_conv_classic(image)
-    double_conv_cpd = LowRankDoubleConv(in_channels=in_channels, out_channels=out_channels, num_groups=8, )
+    double_conv_cpd = LowRankDoubleConv(compression=10, tensor_net_type='cpd', in_channels=in_channels, out_channels=out_channels, num_groups=8)
     double_conv_cpd_output = double_conv_cpd(image)
 
     assert double_conv_cpd_output.size() == double_conv_classic_output.size(), "Something went wrong with double conv CPD, output shapes don't match!"
+
+    # Attempt to get flop count --> failed for tensor network versions!
+    for name, model in zip(('regular','cpd','tucker','tt'),(layer_classic, layer_canon, layer_tucker, layer_tt)):
+        macs, params = get_model_complexity_info(model=model, input_res=(4, 128, 128, 128), as_strings=True,
+                                                 print_per_layer_stat=False, verbose=False)
+        #flops = count_ops(model=model, input=image,verbose=False)
+        #print(name, '-->\tmacs: ', macs,'\tparams: ', params,'\tflops', flops)
+        print(params)
+
+    # Attempt to build low-rank U-Net
+    low_rank_unet = UNet(in_channels=4,out_channels=out_channels)
