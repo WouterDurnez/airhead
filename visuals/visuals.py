@@ -20,12 +20,11 @@ from os.path import join
 from training.inference import test_inference
 
 
-def show_subject(sample:dict, axis:int = 0, slice: int = 100):
-
+def show_subject(sample: dict, axis: int = 0, slice: int = 100):
     # Do we have predictions?
     p = 'prediction' in sample
 
-    img = np.array(sample['input']).take(indices=slice, axis=axis+1)
+    img = np.array(sample['input']).take(indices=slice, axis=axis + 1)
     msk = np.array(sample['target'][0]).take(indices=slice, axis=axis)
     if p:
         pre = np.array(sample['prediction']).take(indices=slice, axis=axis)
@@ -38,16 +37,16 @@ def show_subject(sample:dict, axis:int = 0, slice: int = 100):
 
     # Make plot
     rows = 3 if p else 2
-    fig, ax = plt.subplots(rows, 4, dpi=300, figsize=(20, 10))
+    fig, ax = plt.subplots(rows, 4, dpi=300, figsize=(16, 12))
 
     # Define color map
     cmap_mask = ListedColormap(['none', 'red', 'green', 'yellow'])
 
     # Add labels
-    ax[0,0].set_ylabel('Image')
-    ax[1,0].set_ylabel('Target')
+    ax[0, 0].set_ylabel('Image')
+    ax[1, 0].set_ylabel('Target')
     if p:
-        ax[2,0].set_ylabel('Prediction')
+        ax[2, 0].set_ylabel('Prediction')
 
     # Plot all images and masks
     for index, channel in enumerate(channels):
@@ -64,6 +63,8 @@ def show_subject(sample:dict, axis:int = 0, slice: int = 100):
 
     plt.setp(ax, xticks=[], xticklabels=[], yticks=[], yticklabels=[])
     plt.suptitle(f'BraTS dataset - subject {sample["id"]}', fontweight='bold')
+    plt.colorbar()
+
     plt.tight_layout()
     plt.show()
 
@@ -74,7 +75,7 @@ if __name__ == '__main__':
     hlp.hi("Visualizing BraTS")
 
     model_name = 'unet_baseline'
-    version = 3
+    version = 6
 
     # Set data directory
     vis_dir = join(hlp.LOG_DIR, 'images', model_name)
@@ -97,28 +98,31 @@ if __name__ == '__main__':
     file_name = f'pred_{sample["id"]}.nii.gz'
     prediction = sitk.ReadImage(join(pred_dir, model_name, f'v{version}', file_name))
     prediction = sitk.GetArrayFromImage(prediction)
-    prediction = np.sum(prediction, axis=0)
+    prediction_new = np.zeros(shape=prediction.shape[1:])
 
-    # Swap labels TODO: CHECK THIS OUT, IT'S LIKELY WRONG
-    prediction_new = np.zeros(shape=prediction.shape)
-    for old, new in [(0,0),(1,3),(2,1),(3,1)]:
-        prediction_new[prediction == old] = new
+    '''
+    Remember we used this scheme:
+    class 1: ET (label 4) -- enhancing tumor
+    class 2: TC (label 4 + 1) -- tumor core = enhancing + non-enhancing + necrotic
+    class 3: WT: (label 4 + 1 + 2) -- whole tumor = tumor core + edema
+    '''
 
-    # Crop foreground
+    # Nested, so first fill in WT, then TC, then ET
+    prediction_new[prediction[2] == 1] = 2
+    prediction_new[prediction[1] == 1] = 1
+    prediction_new[prediction[0] == 1] = 4
+
+    # Crop foreground (as we did in visual transforms)
     start = sample['foreground_start_coord']
     end = sample['foreground_end_coord']
+    prediction_new = prediction_new[
+                     start[0]:end[0],
+                     start[1]:end[1],
+                     start[2]:end[2]]
 
-    prediction_new = prediction_new[start[0]:end[0],start[1]:end[1],start[2]:end[2]]
-
-
-
-    #prediction = prediction[0,...]
+    # Add cleaned up prediction to sample dict
     sample['prediction'] = torch.tensor(prediction_new)
-
 
     # Plot
     show_subject(sample=sample, slice=100)
 
-    '''class 1: ET (label 4) -- enhancing tumor
-    class 2: TC (label 4 + 1) -- tumor core = enhancing + non-enhancing + necrotic
-    class 3: WT: (label 4 + 1 + 2) -- whole tumor = tumor core + edema'''
