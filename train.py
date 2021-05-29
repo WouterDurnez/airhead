@@ -39,7 +39,7 @@ if __name__ == '__main__':
 
     # Name
     model_name = 'unet_baseline'
-    version = 5
+    version = 6
 
     # Set data directory
     data_dir = hlp.DATA_DIR
@@ -77,7 +77,7 @@ if __name__ == '__main__':
         #scheduler_params={'warmup_steps': 3*3e2, 'total_steps': 1e5},
         #scheduler_params={'warmup_steps': 294*5, 'total_steps': 1e5},
         #scheduler_params={'warmup_epochs': 1, 'max_epochs':150},
-        scheduler_params={'T_0': 25},
+        scheduler_params={'T_0': 50, 'eta_min':3e-5},
 
         # Inference method
         inference=val_inference,
