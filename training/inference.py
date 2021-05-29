@@ -120,7 +120,7 @@ if __name__ == '__main__':
 
     # Set parameters
     model_name = 'unet_baseline'
-    version = 3
+    version = 6
     write_dir = join(hlp.DATA_DIR, 'predictions', model_name, f'v{version}')
     hlp.set_dir(write_dir)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
