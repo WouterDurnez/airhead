@@ -7,17 +7,22 @@
 """
 Visualization functions
 """
-import torch
-from matplotlib import pyplot as plt
-from matplotlib.colors import ListedColormap
-import utils.helper as hlp
-from utils.helper import set_dir, log
-from training.data_module import BraTSDataModule
+from os.path import join
+
+import SimpleITK as sitk
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-import SimpleITK as sitk
-from os.path import join
-from training.inference import test_inference
+import torch
+from matplotlib.colors import ListedColormap
+
+import utils.helper as hlp
+from training.data_module import BraTSDataModule
+from utils.helper import set_dir, log
+
+colors = sns.color_palette('Reds', n_colors=3)
+colors = ('red','green','yellow')
 
 
 def show_subject(sample: dict, axis: int = 0, slice: int = 100):
@@ -40,7 +45,7 @@ def show_subject(sample: dict, axis: int = 0, slice: int = 100):
     fig, ax = plt.subplots(rows, 4, dpi=300, figsize=(16, 12))
 
     # Define color map
-    cmap_mask = ListedColormap(['none', 'red', 'green', 'yellow'])
+    cmap_mask = ListedColormap(['none', colors[0], colors[1], colors[2]])
 
     # Add labels
     ax[0, 0].set_ylabel('Image')
@@ -63,14 +68,15 @@ def show_subject(sample: dict, axis: int = 0, slice: int = 100):
 
     plt.setp(ax, xticks=[], xticklabels=[], yticks=[], yticklabels=[])
     plt.suptitle(f'BraTS dataset - subject {sample["id"]}', fontweight='bold')
-    plt.colorbar()
+
+    plt.legend(handles=[mpatches.Patch(color=col, label=lab) for col, lab in
+                        zip((colors[0], colors[2], colors[1]), ('ET', 'TC', 'WT'))])
 
     plt.tight_layout()
     plt.show()
 
 
 if __name__ == '__main__':
-
     # Let's go
     hlp.hi("Visualizing BraTS")
 
@@ -125,4 +131,3 @@ if __name__ == '__main__':
 
     # Plot
     show_subject(sample=sample, slice=100)
-
