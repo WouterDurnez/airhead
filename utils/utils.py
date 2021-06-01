@@ -16,6 +16,8 @@ from torch.optim.lr_scheduler import LambdaLR
 from pytorch_lightning.callbacks import Callback
 from utils.helper import log
 import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
 
 #################
 # LR Schedulers #
@@ -274,6 +276,7 @@ if __name__ == '__main__':
     tuning_cpd, tuning_tt, tuning_tucker = [], [], []
     cpd_params, tt_params, tucker_params = [], [], []
     compression_rates = range(5,100,5)
+    #compression_rates = (1,5,10,50,100)
     for comp in compression_rates:
         tuning_cpd.append(get_tuning_var(compression=comp, tensor_net_type='cpd', in_channels=in_channels,
                                   out_channels=out_channels, kernel_size=3))
@@ -290,12 +293,22 @@ if __name__ == '__main__':
         tt_params.append(get_network_size(tuning_param=tuning_tt[-1], tensor_net_type='tt', in_channels=in_channels,
                                   out_channels=out_channels, kernel_size=3))
 
+    # Create data frame
+    df = pd.DataFrame({
+        'Compression': compression_rates,
+        'CPD': cpd_params,
+        'Tucker':tucker_params,
+        'Tensor train': tt_params
+    })
+    df=df.melt(id_vars='Compression',var_name='Tensor network',
+               value_vars=['CPD','Tucker','Tensor train'],value_name='parameters')
+    df.parameters = df.parameters.astype('int')
 
-    plt.plot(compression_rates, cpd_params, 'r', label='cpd')
-    plt.plot(compression_rates, tucker_params, 'b', label='tucker')
-    plt.plot(compression_rates, tt_params, 'g', label='tensor train')
-    plt.xlabel('Compression rates')
+    # Plot
+    sns.set_theme(context='paper', style='white', palette='deep',font_scale=1.1, font='serif')
+    sns.lineplot(data=df,x='Compression',y='parameters', hue='Tensor network',)
     plt.ylabel('# Parameters')
-    plt.yscale('log')
-    plt.legend()
+    plt.xscale('log')
+    sns.despine(left=True,bottom=True)
+
     plt.show()

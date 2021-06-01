@@ -48,10 +48,27 @@ def get_patches(input: torch.Tensor, kernel_dim: int = 3, stride: int = 1, paddi
 
     return patches
 
+def count_lr_conv3d(module, x, y):
 
-##########################################
-# Canonical polyadic decomposition layer #
-##########################################
+    batch_size = x.size()[0]
+
+    kernel_flops = int(module.kernel_flops)
+    bias_flops = 0 if module.bias is not None else -1
+
+    output_elements = y.nelement()
+
+    total_ops = batch_size*(kernel_flops + output_elements*bias_flops)
+
+    print(module.__name__, ':', total_ops)
+
+    module.__flops__ = total_ops # torch.Tensor([int(total_ops)])
+
+
+
+
+###################################
+# Low-rank 3D convolutional layer #
+###################################
 
 class LowRankConv3D(nn.Module):
 
@@ -102,8 +119,8 @@ class LowRankConv3D(nn.Module):
         # Get contraction with optimal path
         self.einsum_expression, self.path_info = self._get_contraction()
 
-        # Save of flops (but this can also be done using ptflops, so watch out here to make a fair comparison)
-        self.flops = self.path_info.opt_cost
+        # Save optimized flops for tensor network
+        self.kernel_flops = self.path_info.opt_cost
 
     def _make_tensor_network(self):
         """
@@ -521,10 +538,10 @@ if __name__ == '__main__':
     # Sanity check: do dimensions make sense? Let's 'benchmark' a classic Conv3D layer
     batch_size = 1
     in_channels = 4
-    out_channels = 64
+    out_channels = 32
     kernel_dim = 3
     stride = 1
-    dim = 64
+    dim = 128
 
     # Test image
     image = torch.rand(1, in_channels, dim, dim, dim)
@@ -535,7 +552,7 @@ if __name__ == '__main__':
     layer_classic.to(device)
 
     # Low-rank layers
-    compression = 15
+    compression = 2
 
     # Canonical layer
     layer_canon = LowRankConv3D(in_channels=in_channels, out_channels=out_channels,
@@ -576,10 +593,9 @@ if __name__ == '__main__':
     # Attempt to get flop count --> failed for tensor network versions!
     for name, model in zip(('regular','cpd','tucker','tt'),(layer_classic, layer_canon, layer_tucker, layer_tt)):
         macs, params = get_model_complexity_info(model=model, input_res=(4, 128, 128, 128), as_strings=True,
-                                                 print_per_layer_stat=False, verbose=False)
+                                                 print_per_layer_stat=False, verbose=False,
+                                                 custom_modules_hooks={'LowRankConv3D': count_lr_conv3d})
         #flops = count_ops(model=model, input=image,verbose=False)
         #print(name, '-->\tmacs: ', macs,'\tparams: ', params,'\tflops', flops)
-        print(params)
+        print(name, macs, 'macs')
 
-    # Attempt to build low-rank U-Net
-    low_rank_unet = UNet(in_channels=4,out_channels=out_channels)
