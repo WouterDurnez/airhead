@@ -69,8 +69,8 @@ def show_subject(sample: dict, axis: int = 0, slice: int = 100):
     plt.setp(ax, xticks=[], xticklabels=[], yticks=[], yticklabels=[])
     plt.suptitle(f'BraTS dataset - subject {sample["id"]}', fontweight='bold')
 
-    plt.legend(handles=[mpatches.Patch(color=col, label=lab) for col, lab in
-                        zip((colors[0], colors[2], colors[1]), ('ET', 'TC', 'WT'))])
+    #plt.legend(handles=[mpatches.Patch(color=col, label=lab) for col, lab in
+    #                    zip((colors[0], colors[2], colors[1]), ('ET', 'TC', 'WT'))])
 
     plt.tight_layout()
     plt.show()

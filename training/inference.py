@@ -18,8 +18,8 @@ from torch import optim
 
 import utils.helper as hlp
 from training.data_module import BraTSDataModule
-from models.unet import UNet
-from models.unet_lightning import UNetLightning
+from models.baseline_unet import UNet
+from training.lightning import UNetLightning
 from training.losses import *
 from utils.utils import WarmupCosineSchedule
 from tqdm import tqdm

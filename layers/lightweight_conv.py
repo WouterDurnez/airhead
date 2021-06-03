@@ -24,7 +24,7 @@ from ptflops import get_model_complexity_info
 from sympy import Symbol, solve
 from torch import Tensor
 
-from models.unet import DoubleConv
+from models.baseline_unet import DoubleConv
 from utils.helper import log, hi
 
 pp = PrettyPrinter(4)
@@ -131,6 +131,11 @@ class LowRankConv3D(nn.Module):
 
         # Save optimized flops for tensor network
         self.kernel_flops = self.path_info.opt_cost
+
+        # Calculate actual compression rate
+        self.max_params = (self.kernel_size**3*self.in_channels*self.out_channels)
+        self.kernel_params = self._get_tensor_network_size()
+        self.actual_compression = self.max_params/self.kernel_params
 
     def _make_tensor_network(self):
         """
@@ -284,8 +289,8 @@ class LowRankConv3D(nn.Module):
             """
 
             # We tune the bond dimensions (assumed equal across the 'train')
-            r = round(self._get_tuning_par()) if round(self._get_tuning_par()) > 0 else 1
-            self.r1 = self.r2 = self.r3 = self.r4 = r
+            self.r = round(self._get_tuning_par()) if round(self._get_tuning_par()) > 0 else 1
+            self.r1 = self.r2 = self.r3 = self.r4 = self.r
 
             # First kernel factor matrices (U_kh, U_kd, U_kw)
             nodes['U_k_h'] = {
@@ -451,6 +456,54 @@ class LowRankConv3D(nn.Module):
 
             return evaluated_solutions[0]
 
+    def _get_tensor_network_size(self) -> float:
+        """
+        Get the number of parameters involved in the kernel decomposition/tensor network,
+        so we can calculate the actual compression rate
+        """
+        #######
+        # CPD #
+        #######
+
+        if self.tensor_net_type in ['cpd', 'canonical']:
+            ''''
+            cpd_params:
+            r * (in_channels + out_channels + 3 * kernel_size)
+
+            compression = max_params / cpd_params
+            '''
+
+            return self.rank * (self.in_channels + self.out_channels + 3 * self.kernel_size)
+
+        ##########
+        # TUCKER #
+        ##########
+
+        if self.tensor_net_type in ['tucker']:
+            '''
+            tucker params:
+            ((C_in/S) * 3 * 3 * 3 * (C_out/S)) + 3 * (3*3)             + (input_channels**2/S) + (output_channels**2/S)
+            = core tensor shape                + 3 * kernel node shape + input node shape      + output node shape 
+
+            '''
+            in_param = round(self.in_channels / self.S)
+            out_param = round(self.out_channels / self.S)
+            return (in_param * self.kernel_size**3 * out_param) + \
+                   3 * self.kernel_size** 2 + \
+                   (self.in_channels * in_param) + \
+                   (self.out_channels * out_param)
+
+        ################
+        # TENSOR TRAIN #
+        ################
+
+        if self.tensor_net_type in ['tt', 'tensor-train', 'train']:
+            '''
+            tensor train params:
+            r * (in_channels + r*(3+3+3) + out_channels)
+            '''
+            return self.r * (self.in_channels + self.r * 9 + self.out_channels)
+
     def forward(self, input: Tensor):
 
         # First, get patches
@@ -562,7 +615,7 @@ if __name__ == '__main__':
     layer_classic.to(device)
 
     # Low-rank layers
-    compression = 100
+    compression = 30
 
     # Canonical layer
     layer_canon = LowRankConv3D(in_channels=in_channels, out_channels=out_channels,

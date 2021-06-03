@@ -19,8 +19,8 @@ from pytorch_lightning.loggers import TensorBoardLogger
 
 from utils import helper as hlp
 from utils.helper import log
-from models.unet import UNet
-from models.unet_lightning import UNetLightning
+from models.baseline_unet import UNet
+from training.lightning import UNetLightning
 from training.data_module import BraTSDataModule
 from training.inference import val_inference, test_inference
 from training.losses import dice_loss, dice_metric, dice_et, dice_tc, dice_wt, hd_metric, hd_et, hd_tc, hd_wt

@@ -10,11 +10,11 @@ Lightweight U-Net
 import torch.nn as nn
 from torch import cat
 
-from lightweight.lightweight_conv import LowRankDoubleConv
-from models.unet import Upsample
+from layers.lightweight_conv import LowRankDoubleConv
+from models.baseline_unet import Upsample
 from utils.helper import log, set_params
 import torch
-from models.unet import UNet
+from models.baseline_unet import UNet
 
 # Full 3D-UNet architecture
 class LowRankUNet(nn.Module):

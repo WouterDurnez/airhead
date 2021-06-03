@@ -20,16 +20,14 @@ from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch import optim
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
-from models.unet import UNet
-from models.unet_lightning import UNetLightning
+from models.baseline_unet import UNet
+from training.lightning import UNetLightning
 from training.data_module import BraTSDataModule
 from training.inference import val_inference, test_inference
 from training.losses import dice_loss, dice_metric, dice_et, dice_tc, dice_wt, hd_metric, hd_et, hd_tc, hd_wt
 from utils import helper as hlp
 from utils.helper import log
 from utils.helper import set_dir
-from utils.utils import WarmupCosineSchedule, TakeSnapshot
-from pl_bolts.optimizers.lr_scheduler import LinearWarmupCosineAnnealingLR
 
 pp = PrettyPrinter()
 
