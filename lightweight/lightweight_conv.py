@@ -15,15 +15,15 @@ Lightweight convolutional layers
 import math
 from pprint import PrettyPrinter
 
+import numpy as np
 import opt_einsum as oe
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from ptflops import get_model_complexity_info
-from pthflops import count_ops
 from sympy import Symbol, solve
 from torch import Tensor
-from models.unet import UNet
+
 from models.unet import DoubleConv
 from utils.helper import log, hi
 
@@ -48,22 +48,32 @@ def get_patches(input: torch.Tensor, kernel_dim: int = 3, stride: int = 1, paddi
 
     return patches
 
-def count_lr_conv3d(module, x, y):
 
-    batch_size = x.size()[0]
+def count_lr_conv3d(module, _, y):
+    """
+    Flop count hook for ptflops, to be used with LowRankConv3D
+    """
 
-    kernel_flops = int(module.kernel_flops)
-    bias_flops = 0 if module.bias is not None else -1
+    # All output elements
+    output_voxels = y.nelement()
 
-    output_elements = y.nelement()
+    # Output voxels (per channel)
+    output_voxels_per_channel = np.prod(y.shape[2:])
 
-    total_ops = batch_size*(kernel_flops + output_elements*bias_flops)
+    # Kernel flops, given by path_info (see LowRankConv3D)
+    kernel_flops = module.kernel_flops
 
-    print(module.__name__, ':', total_ops)
+    # We add bias to each voxel in all output channels
+    bias_flops = output_voxels if module.bias is not None else 0
 
-    module.__flops__ = total_ops # torch.Tensor([int(total_ops)])
+    # We're calculating macs, not flops (hence the /2). Output channels
+    # are included in the path_cost, hence we multiply by output_voxels
+    # rather than output_elements
+    total_ops = output_voxels_per_channel * kernel_flops / 2 + bias_flops
 
+    print(f'{module.__name__}: kernel ops {kernel_flops} - bias ops {bias_flops} \t TOTAL {total_ops}')
 
+    module.__flops__ += int(total_ops)
 
 
 ###################################
@@ -552,7 +562,7 @@ if __name__ == '__main__':
     layer_classic.to(device)
 
     # Low-rank layers
-    compression = 2
+    compression = 100
 
     # Canonical layer
     layer_canon = LowRankConv3D(in_channels=in_channels, out_channels=out_channels,
@@ -585,7 +595,7 @@ if __name__ == '__main__':
     # Double conv test
     double_conv_classic = DoubleConv(in_channels=in_channels, out_channels=out_channels)
     double_conv_classic_output = double_conv_classic(image)
-    double_conv_cpd = LowRankDoubleConv(compression=10, tensor_net_type='cpd', in_channels=in_channels, out_channels=out_channels, num_groups=8)
+    double_conv_cpd = LowRankDoubleConv(compression=compression, tensor_net_type='cpd', in_channels=in_channels, out_channels=out_channels, num_groups=8)
     double_conv_cpd_output = double_conv_cpd(image)
 
     assert double_conv_cpd_output.size() == double_conv_classic_output.size(), "Something went wrong with double conv CPD, output shapes don't match!"
@@ -594,8 +604,8 @@ if __name__ == '__main__':
     for name, model in zip(('regular','cpd','tucker','tt'),(layer_classic, layer_canon, layer_tucker, layer_tt)):
         macs, params = get_model_complexity_info(model=model, input_res=(4, 128, 128, 128), as_strings=True,
                                                  print_per_layer_stat=False, verbose=False,
-                                                 custom_modules_hooks={'LowRankConv3D': count_lr_conv3d})
+                                                 custom_modules_hooks={LowRankConv3D: count_lr_conv3d})
         #flops = count_ops(model=model, input=image,verbose=False)
         #print(name, '-->\tmacs: ', macs,'\tparams: ', params,'\tflops', flops)
-        print(name, macs, 'macs')
+        print(name, macs)
 
