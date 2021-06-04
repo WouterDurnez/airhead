@@ -615,7 +615,7 @@ if __name__ == '__main__':
     layer_classic.to(device)
 
     # Low-rank layers
-    compression = 30
+    compression = 2
 
     # Canonical layer
     layer_canon = LowRankConv3D(in_channels=in_channels, out_channels=out_channels,
@@ -660,5 +660,5 @@ if __name__ == '__main__':
                                                  custom_modules_hooks={LowRankConv3D: count_lr_conv3d})
         #flops = count_ops(model=model, input=image,verbose=False)
         #print(name, '-->\tmacs: ', macs,'\tparams: ', params,'\tflops', flops)
-        print(name, macs)
+        print(name, 'macs', macs, 'params', params)
 
