@@ -5,7 +5,7 @@
 #
 
 """
-Main training script for lightweight Unet
+Main training script for lightweight U-Net
 """
 
 from os.path import join
@@ -92,9 +92,6 @@ if __name__ == '__main__':
         test_inference_params=None,
     )
 
-    # Load checkpoint
-    #model.load_from_checkpoint(checkpoint_path=join(snap_dir,f'final_{model_name}_v0.ckpt'))
-
     # Initialize data module
     log("Initializing data module")
     brats = BraTSDataModule(data_dir=join(data_dir,"MICCAI_BraTS2020_TrainingData"),
@@ -119,7 +116,6 @@ if __name__ == '__main__':
         callbacks=[
             LearningRateMonitor(logging_interval="step"),
             PrintTableMetricsCallback(),
-            #TakeSnapshot(epochs=(1, 24, 49), save_dir=snap_dir)
         ],
     )
 
@@ -132,8 +128,6 @@ if __name__ == '__main__':
     trainer.save_checkpoint(join(snap_dir, f'final_{model_name}_v{version}.ckpt'))
 
     # Test
-    #torch.cuda.empty_cache()
-    #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     log("Evaluating model")
     trainer.test()
     results = model.test_results
@@ -143,7 +137,9 @@ if __name__ == '__main__':
         macs, params = get_model_complexity_info(model=model, input_res=(4, 128, 128, 128), as_strings=True,
                                                  print_per_layer_stat=True, verbose=False)
 
-    eval = {'results': results,
+    eval = {'model_name': model_name,
+            'version': version,
+            'results': results,
             'n_param': model.get_n_parameters(),
             'flops_count': macs,
             'params': params}
