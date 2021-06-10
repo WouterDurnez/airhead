@@ -105,7 +105,7 @@ class LowRankConv3D(nn.Module):
         self.bias = bias
         self.tensor_net_type = tensor_net_type
 
-        types = ['cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt']
+        types = ['cp', 'cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt']
         assert self.tensor_net_type in types, f"Choose a valid tensor network {types}"
 
         self.__name__ = f'{self.tensor_net_type.lower()}_low_rank_conv'
@@ -164,7 +164,7 @@ class LowRankConv3D(nn.Module):
         # CANONICAL POLYADIC TENSOR DECOMPOSITION FORMAT #
         ##################################################
 
-        if self.tensor_net_type in ['canonical', 'cpd']:
+        if self.tensor_net_type in ['cp', 'canonical', 'cpd']:
 
             log(f'Creating CPD tensor network [compression rate = {self.compression}].', verbosity=3, color='magenta')
 
@@ -384,9 +384,9 @@ class LowRankConv3D(nn.Module):
         # CPD #
         #######
 
-        if self.tensor_net_type in ['cpd', 'canonical']:
+        if self.tensor_net_type in ['cp', 'cpd', 'canonical']:
             ''''
-            cpd_params:
+            cp_params:
             r * (in_channels + out_channels + 3 * kernel_size)
 
             compression = max_params / cpd_params
@@ -465,7 +465,7 @@ class LowRankConv3D(nn.Module):
         # CPD #
         #######
 
-        if self.tensor_net_type in ['cpd', 'canonical']:
+        if self.tensor_net_type in ['cp', 'cpd', 'canonical']:
             ''''
             cpd_params:
             r * (in_channels + out_channels + 3 * kernel_size)
@@ -615,7 +615,7 @@ if __name__ == '__main__':
     layer_classic.to(device)
 
     # Low-rank layers
-    compression = 2
+    compression = 20
 
     # Canonical layer
     layer_canon = LowRankConv3D(in_channels=in_channels, out_channels=out_channels,

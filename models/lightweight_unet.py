@@ -12,9 +12,10 @@ from torch import cat
 
 from layers.lightweight_conv import LowRankDoubleConv
 from models.baseline_unet import Upsample
-from utils.helper import log, set_params
+from utils.helper import log, set_params, count_params
 import torch
 from models.baseline_unet import UNet
+
 
 # Full 3D-UNet architecture
 class LowRankUNet(nn.Module):
@@ -178,10 +179,10 @@ if __name__ == '__main__':
     log(f'Input size (single image): {x.size()}')
 
     # Initialize model
-    lr_unet = LowRankUNet(compression=10,tensor_net_type='cpd',
+    lr_unet = LowRankUNet(compression=2,tensor_net_type='cpd',
                         in_channels=4, out_channels=3, head=False, downsample='strided_convolution')
 
     # Process example input
-    out = lr_unet(x)
+    #out = lr_unet(x)
     #out2 = model2(x)
-    log(f'Output size (single image): {out.size()}')
+    #log(f'Output size (single image): {out.size()}')
