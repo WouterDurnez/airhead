@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+#PBS -l nodes=1:ppn=32:gpus=2
+#PBS -l walltime=24:00:00
+
+#PBS -N unet_${TYPE}_${COMP}
+#PBS -l vmem=30gb
+#PBS -m abe
+
+cd $PBS_O_WORKDIR
+
+export PATH="${VSC_DATA}/miniconda3/bin:${PATH}"
+source activate airenv
+
+python train_lightweight.py --type ${TYPE} --comp ${COMP}
