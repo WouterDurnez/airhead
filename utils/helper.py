@@ -11,6 +11,7 @@ from typing import Callable
 from colorama import Fore, Style
 from pytorch_lightning import seed_everything
 from torch import Tensor
+from torch.nn import Module
 
 VERBOSITY = 3
 TIMESTAMPED = True
@@ -173,6 +174,27 @@ def set_dir(*dirs):
         else:
             log("\'{}\' folder accounted for.".format(dir), verbosity=3)
 
+
+def count_params(module: Module, format=None, precision=3):
+    """Count total parameters in a module/model"""
+
+    n = sum(p.numel() for p in module.parameters())
+
+    if format == 'k':
+
+        return f'{round(n/1000,precision)}k params'
+    elif format == 'M':
+
+        return f'{round(n/1000000,precision)}M params'
+    elif format == 'G':
+
+        return f'{round(n/1000000000,precision)}G params'
+    elif format == 'base':
+
+        return f'{round(n, precision)} params'
+
+    else:
+        return n
 
 if __name__ == '__main__':
     hi('Test!')
