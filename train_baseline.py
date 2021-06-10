@@ -37,14 +37,13 @@ if __name__ == '__main__':
 
     # Name
     model_name = 'unet_baseline'
-    version = 6
+    version = 99
 
     # Set data directory
     data_dir = hlp.DATA_DIR
     tb_dir = join(hlp.LOG_DIR, 'tb_logs')
     snap_dir = join(hlp.LOG_DIR, 'snapshots', model_name)
     result_dir = join(hlp.LOG_DIR, 'results', model_name)
-    #model_dir = join(hlp.LOG_DIR, 'models', model_name)
     set_dir(data_dir, tb_dir, snap_dir, result_dir)
 
     # Initialize model
@@ -69,12 +68,8 @@ if __name__ == '__main__':
         optimizer_params={'lr': 1e-4, 'weight_decay': 1e-5},
 
         # Learning rate scheduler
-        #scheduler=WarmupCosineSchedule,
         scheduler=CosineAnnealingWarmRestarts,
         scheduler_config={'interval': 'epoch'},
-        #scheduler_params={'warmup_steps': 3*3e2, 'total_steps': 1e5},
-        #scheduler_params={'warmup_steps': 294*5, 'total_steps': 1e5},
-        #scheduler_params={'warmup_epochs': 1, 'max_epochs':150},
         scheduler_params={'T_0': 50, 'eta_min':3e-5},
 
         # Inference method
@@ -104,12 +99,12 @@ if __name__ == '__main__':
     log("Initializing trainer")
     trainer = Trainer(
         max_steps=100000,
-        max_epochs=150,
+        max_epochs=200,
         logger=tb_logger,
         gpus=1,
-        num_nodes=1,
+        #num_nodes=8,
         deterministic=True,
-        # distributed_backend='ddp',
+        #distributed_backend='ddp',
         callbacks=[
             LearningRateMonitor(logging_interval="step"),
             PrintTableMetricsCallback(),
@@ -126,8 +121,6 @@ if __name__ == '__main__':
     trainer.save_checkpoint(join(snap_dir, f'final_{model_name}_v{version}.ckpt'))
 
     # Test
-    #torch.cuda.empty_cache()
-    #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     log("Evaluating model")
     trainer.test()
     results = model.test_results
@@ -137,7 +130,9 @@ if __name__ == '__main__':
         macs, params = get_model_complexity_info(model=model, input_res=(4, 128, 128, 128), as_strings=True,
                                                  print_per_layer_stat=True, verbose=False)
 
-    eval = {'results': results,
+    eval = {'model_name': model_name,
+            'version': version,
+            'results': results,
             'n_param': model.get_n_parameters(),
             'flops_count': macs,
             'params': params}

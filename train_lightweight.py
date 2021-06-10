@@ -28,27 +28,37 @@ from training.losses import dice_loss, dice_metric, dice_et, dice_tc, dice_wt, h
 from utils import helper as hlp
 from utils.helper import log
 from utils.helper import set_dir
+import argparse, sys
 
 pp = PrettyPrinter()
 
 if __name__ == '__main__':
-    # Let's go
-    hlp.hi("Training baseline U-Net")
 
-    # Name
-    model_name = 'unet_canon'
-    version = 0
+    # Let's go
+    hlp.hi("Training lightweight U-Net")
+
+    # Get arguments
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('--type', help='Tensor network type')
+    parser.add_argument('--comp', help='Compression rate')
+
+    args = parser.parse_args()
+
+    log(f'Tensor network type: {args.type}', color='green')
+    log(f'Compression rate:    {args.comp}', color='green')
 
     # Parameters
-    compression = 50
-    tensor_net_type = 'cpd'
+    tensor_net_type = args.type
+    compression = int(args.comp)
+    model_name = f'unet_{tensor_net_type}'
+    version = compression
 
     # Set data directory
     data_dir = hlp.DATA_DIR
     tb_dir = join(hlp.LOG_DIR, 'tb_logs')
     snap_dir = join(hlp.LOG_DIR, 'snapshots', model_name)
     result_dir = join(hlp.LOG_DIR, 'results', model_name)
-    #model_dir = join(hlp.LOG_DIR, 'models', model_name)
     set_dir(data_dir, tb_dir, snap_dir, result_dir)
 
     # Initialize model
@@ -75,12 +85,8 @@ if __name__ == '__main__':
         optimizer_params={'lr': 1e-4, 'weight_decay': 1e-5},
 
         # Learning rate scheduler
-        #scheduler=WarmupCosineSchedule,
         scheduler=CosineAnnealingWarmRestarts,
         scheduler_config={'interval': 'epoch'},
-        #scheduler_params={'warmup_steps': 3*3e2, 'total_steps': 1e5},
-        #scheduler_params={'warmup_steps': 294*5, 'total_steps': 1e5},
-        #scheduler_params={'warmup_epochs': 1, 'max_epochs':150},
         scheduler_params={'T_0': 50, 'eta_min':3e-5},
 
         # Inference method
@@ -95,7 +101,7 @@ if __name__ == '__main__':
     # Initialize data module
     log("Initializing data module")
     brats = BraTSDataModule(data_dir=join(data_dir,"MICCAI_BraTS2020_TrainingData"),
-                            num_workers=8,
+                            num_workers=0,
                             batch_size=1,
                             validation_size=.2)
     brats.setup()
@@ -107,10 +113,10 @@ if __name__ == '__main__':
     log("Initializing trainer")
     trainer = Trainer(
         max_steps=100000,
-        max_epochs=150,
+        max_epochs=200,
         logger=tb_logger,
         gpus=1,
-        num_nodes=1,
+        #num_nodes=1,
         deterministic=True,
         # distributed_backend='ddp',
         callbacks=[
