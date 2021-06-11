@@ -117,7 +117,7 @@ if __name__ == '__main__':
         max_steps=100000,
         max_epochs=200,
         logger=tb_logger,
-        gpus=2,
+        gpus=-1,
         #num_nodes=1,
         deterministic=True,
         distributed_backend='ddp',
