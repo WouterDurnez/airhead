@@ -16,14 +16,13 @@ This repository hosts the code for my thesis at KULeuven, in order to obtain the
 ### TODOs  
 
 #### General
-* Visualize some images & masks (finalize)
-* Move to HPC cluster
 
 #### Training
   * (maybe) move parameters to dict-style **config file**  
   
 #### LIGHTWEIGHT LAYERS!
-  * Build lightweight versions of U-Net
-    * CPD
-    * Tensor train
-    * Tucker
+  * Built, but issues training on the HPC. Likely reason: the triple use of `torch.Tensor.unfold`. 
+    
+    **Potential remedies**:
+    - Sharding (full or partial)
+    - Active checkpointing
