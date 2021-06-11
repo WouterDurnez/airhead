@@ -20,7 +20,6 @@ import opt_einsum as oe
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from fairscale.nn.checkpoint import checkpoint_wrapper
 from ptflops import get_model_complexity_info
 from sympy import Symbol, solve
 from torch import Tensor
@@ -85,9 +84,9 @@ class AirConv3D(nn.Module):
 
     def __init__(self,
                  compression: int,
+                 tensor_net_type: str,
                  in_channels: int,
                  out_channels: int,
-                 tensor_net_type: str,
                  kernel_size: int = 3,
                  stride: int = 1,
                  padding: int = 1,
@@ -98,13 +97,14 @@ class AirConv3D(nn.Module):
 
         # Initializing attributes
         self.compression = compression
+        self.tensor_net_type = tensor_net_type
+
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.kernel_size = kernel_size
         self.stride = stride
         self.padding = padding
         self.bias = bias
-        self.tensor_net_type = tensor_net_type
 
         types = ['cp', 'cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt']
         assert self.tensor_net_type in types, f"Choose a valid tensor network {types}"
@@ -551,42 +551,39 @@ class AirDoubleConv(nn.Module):
         conv_par.setdefault('padding', 1)
 
         # Define inner block architecture
-        self.block = checkpoint_wrapper(
-            module=nn.Sequential(
+        self.block = nn.Sequential(
 
-                # Lightweight convolutional layer
-                AirConv3D(
-                    compression=compression,
-                    in_channels=in_channels,
-                    out_channels=out_channels,
-                    stride=strides[0],
-                    tensor_net_type=tensor_net_type,
-                    **conv_par
-                ),
-
-                # Normalization layer (default minibatch of 8 instances)
-                nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
-
-                # Activation layer
-                activation,
-
-                # Lightweight convolutional layer
-                AirConv3D(
-                    compression=compression,
-                    in_channels=out_channels,
-                    out_channels=out_channels,
-                    stride=strides[1],
-                    tensor_net_type=tensor_net_type,
-                    **conv_par
-                ),
-
-                # Normalization layer (default minibatch of 8 instances)
-                nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
-
-                # Activation layer
-                activation
+            # Lightweight convolutional layer
+            AirConv3D(
+                compression=compression,
+                in_channels=in_channels,
+                out_channels=out_channels,
+                stride=strides[0],
+                tensor_net_type=tensor_net_type,
+                **conv_par
             ),
-            offload_to_cpu=True
+
+            # Normalization layer (default minibatch of 8 instances)
+            nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
+
+            # Activation layer
+            activation,
+
+            # Lightweight convolutional layer
+            AirConv3D(
+                compression=compression,
+                in_channels=out_channels,
+                out_channels=out_channels,
+                stride=strides[1],
+                tensor_net_type=tensor_net_type,
+                **conv_par
+            ),
+
+            # Normalization layer (default minibatch of 8 instances)
+            nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
+
+            # Activation layer
+            activation
         )
 
     # Forward function (backward propagation is added automatically)

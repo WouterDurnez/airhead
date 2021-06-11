@@ -20,7 +20,6 @@ import opt_einsum as oe
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from fairscale.nn.checkpoint import checkpoint_wrapper
 from ptflops import get_model_complexity_info
 from sympy import Symbol, solve
 from torch import Tensor
@@ -549,43 +548,41 @@ class AirDoubleConvAlt(nn.Module):
         conv_par.setdefault('padding', 1)
 
         # Define inner block architecture
-        self.block = checkpoint_wrapper(
-            module=nn.Sequential(
+        self.block = nn.Sequential(
 
-                # Lightweight convolutional layer
-                AirConv3DAlt(
-                    compression=compression,
-                    in_channels=in_channels,
-                    out_channels=out_channels,
-                    stride=strides[0],
-                    tensor_net_type=tensor_net_type,
-                    **conv_par
-                ),
-
-                # Normalization layer (default minibatch of 8 instances)
-                nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
-
-                # Activation layer
-                activation,
-
-                # Lightweight convolutional layer
-                AirConv3DAlt(
-                    compression=compression,
-                    in_channels=out_channels,
-                    out_channels=out_channels,
-                    stride=strides[1],
-                    tensor_net_type=tensor_net_type,
-                    **conv_par
-                ),
-
-                # Normalization layer (default minibatch of 8 instances)
-                nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
-
-                # Activation layer
-                activation
+            # Lightweight convolutional layer
+            AirConv3DAlt(
+                compression=compression,
+                in_channels=in_channels,
+                out_channels=out_channels,
+                stride=strides[0],
+                tensor_net_type=tensor_net_type,
+                **conv_par
             ),
-            offload_to_cpu=True
+
+            # Normalization layer (default minibatch of 8 instances)
+            nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
+
+            # Activation layer
+            activation,
+
+            # Lightweight convolutional layer
+            AirConv3DAlt(
+                compression=compression,
+                in_channels=out_channels,
+                out_channels=out_channels,
+                stride=strides[1],
+                tensor_net_type=tensor_net_type,
+                **conv_par
+            ),
+
+            # Normalization layer (default minibatch of 8 instances)
+            nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
+
+            # Activation layer
+            activation
         )
+
 
     # Forward function (backward propagation is added automatically)
     def forward(self, input):
@@ -621,19 +618,19 @@ if __name__ == '__main__':
     compression = 20
 
     # Canonical layer
-    layer_canon = LowRankConv3D(in_channels=in_channels, out_channels=out_channels,
+    layer_canon = AirConv3DAlt(in_channels=in_channels, out_channels=out_channels,
                                 compression=compression,
                                 kernel_size=kernel_dim, padding=1, tensor_net_type='cpd')
     layer_canon.to(device)
 
     # Tucker layer
-    layer_tucker = LowRankConv3D(in_channels=in_channels, out_channels=out_channels,
+    layer_tucker = AirConv3DAlt(in_channels=in_channels, out_channels=out_channels,
                                  compression=compression,
                                  kernel_size=kernel_dim, padding=1, tensor_net_type='tucker')
     layer_tucker.to(device)
 
     # TT layer
-    layer_tt = LowRankConv3D(in_channels=in_channels, out_channels=out_channels,
+    layer_tt = AirConv3DAlt(in_channels=in_channels, out_channels=out_channels,
                              compression=compression,
                              kernel_size=kernel_dim, padding=1, tensor_net_type='train')
     layer_tt.to(device)
@@ -651,7 +648,7 @@ if __name__ == '__main__':
     # Double conv test
     double_conv_classic = DoubleConv(in_channels=in_channels, out_channels=out_channels)
     double_conv_classic_output = double_conv_classic(image)
-    double_conv_cpd = LowRankDoubleConv(compression=compression, tensor_net_type='cpd', in_channels=in_channels,
+    double_conv_cpd = AirDoubleConvAlt(compression=compression, tensor_net_type='cpd', in_channels=in_channels,
                                         out_channels=out_channels, num_groups=8)
     double_conv_cpd_output = double_conv_cpd(image)
 
@@ -661,7 +658,7 @@ if __name__ == '__main__':
     for name, model in zip(('regular', 'cpd', 'tucker', 'tt'), (layer_classic, layer_canon, layer_tucker, layer_tt)):
         macs, params = get_model_complexity_info(model=model, input_res=(4, 128, 128, 128), as_strings=True,
                                                  print_per_layer_stat=False, verbose=False,
-                                                 custom_modules_hooks={LowRankConv3D: count_lr_conv3d})
+                                                 custom_modules_hooks={AirConv3DAlt: count_lr_conv3d})
         # flops = count_ops(model=model, input=image,verbose=False)
         # print(name, '-->\tmacs: ', macs,'\tparams: ', params,'\tflops', flops)
         print(name, 'macs', macs, 'params', params)
