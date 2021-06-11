@@ -69,6 +69,7 @@ class BraTSDataModule(LightningDataModule):
     def __init__(
             self,
             data_dir=None,
+            patch_dim: int = 128,
             num_workers=0,
             batch_size=1,
             validation_size=0.2,
@@ -77,6 +78,9 @@ class BraTSDataModule(LightningDataModule):
 
         # Directories (TrainingData only)
         self.data_dir = data_dir
+
+        # Dimension of input (used for rescaling)
+        self.patch_dim = patch_dim
 
         # Number of workers (for leveraging multi-core CPU/GPU)
         self.num_workers = num_workers
@@ -88,8 +92,8 @@ class BraTSDataModule(LightningDataModule):
         self.validation_size = validation_size
 
         # Get all transforms
-        self.training_transform = get_train_transform()
-        self.validation_transform = get_val_transform()
+        self.training_transform = get_train_transform(patch_dim=self.patch_dim)
+        self.validation_transform = get_val_transform(patch_dim=self.patch_dim)
         self.test_transform = get_test_transform()
         self.visualization_transform = get_vis_transform()
 
@@ -169,7 +173,7 @@ class BraTSDataModule(LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,  # Reshuffle dataset at every epoch
             num_workers=self.num_workers,
-            pin_memory=True,  # Copy Tensors in CUDA pinned memory before returning them
+            pin_memory=False,  # Copy Tensors in CUDA pinned memory before returning them
         )
         return training_loader
 
@@ -178,7 +182,7 @@ class BraTSDataModule(LightningDataModule):
             self.validation_set,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            pin_memory=True,
+            pin_memory=False,
         )
         return validation_loader
 
@@ -187,7 +191,7 @@ class BraTSDataModule(LightningDataModule):
             self.test_set,
             batch_size=self.batch_size,
             num_workers=self.num_workers,
-            pin_memory=True,
+            pin_memory=False,
         )
         return test_loader
 

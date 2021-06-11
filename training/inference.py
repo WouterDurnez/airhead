@@ -60,7 +60,7 @@ def val_inference(input: torch.Tensor, model: nn.Module):
     return output
 
 
-def test_inference(input: torch.Tensor, model: nn.Module, **kwargs):
+def test_inference(input: torch.Tensor, model: nn.Module, roi_dim:int = 128, **kwargs):
     """
     Inference function for test data, using sliding window
 
@@ -71,7 +71,7 @@ def test_inference(input: torch.Tensor, model: nn.Module, **kwargs):
 
     # Generate output using sliding window (sized 128^3)
     output = sliding_window_inference(
-        inputs=input, roi_size=(128, 128, 128), sw_batch_size=1, predictor=model, **kwargs
+        inputs=input, roi_size=(roi_dim, roi_dim, roi_dim), sw_batch_size=1, predictor=model, **kwargs
     )
 
     # Post transforms

@@ -98,7 +98,7 @@ class OneHotEncoder(MapTransform):
 ################
 
 # Training transforms (including augmentation)
-def get_train_transform():
+def get_train_transform(patch_dim:int = 128):
     """
     DATA PREPARATION
     * read data
@@ -128,7 +128,7 @@ def get_train_transform():
         RandFlipd(keys=["input", "target"], prob=0.5, spatial_axis=0),
         RandAffined(
             keys=["input", "target"],
-            spatial_size=[128, 128, 128],
+            spatial_size=[patch_dim, patch_dim, patch_dim],
             prob=0.5,
             rotate_range=10,
             mode=("bilinear", "nearest"),
@@ -144,7 +144,7 @@ def get_train_transform():
 
 
 # Validation transforms
-def get_val_transform():
+def get_val_transform(patch_dim:int = 128):
     """
     DATA PREPARATION
     * read data
@@ -163,7 +163,7 @@ def get_val_transform():
         CropForegroundd(keys=["input", "target"], source_key="input"),
         Resized(
             keys=["input", "target"],
-            spatial_size=[128, 128, 128],
+            spatial_size=[patch_dim, patch_dim, patch_dim],
             mode=("trilinear", "nearest"),
         ),
         NormalizeIntensityd(keys="input", nonzero=True, channel_wise=True),
