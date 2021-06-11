@@ -87,7 +87,7 @@ if __name__ == '__main__':
     # Initialize data module
     log("Initializing data module")
     brats = BraTSDataModule(data_dir=join(data_dir,"MICCAI_BraTS2020_TrainingData"),
-                            num_workers=8,
+                            num_workers=0,
                             batch_size=1,
                             validation_size=.2)
     brats.setup()
@@ -101,10 +101,10 @@ if __name__ == '__main__':
         max_steps=100000,
         max_epochs=200,
         logger=tb_logger,
-        gpus=1,
+        gpus=-1,
         #num_nodes=8,
         deterministic=True,
-        #distributed_backend='ddp',
+        distributed_backend='ddp',
         callbacks=[
             LearningRateMonitor(logging_interval="step"),
             PrintTableMetricsCallback(),
