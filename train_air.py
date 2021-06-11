@@ -20,7 +20,7 @@ from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch import optim
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
-from models.lightweight_unet import LowRankUNet
+from models.air_unet import AirUNet
 from training.lightning import UNetLightning
 from training.data_module import BraTSDataModule
 from training.inference import val_inference, test_inference
@@ -29,6 +29,7 @@ from utils import helper as hlp
 from utils.helper import log
 from utils.helper import set_dir
 import argparse, sys
+from layers.air_conv_alt import AirDoubleConvAlt
 
 pp = PrettyPrinter()
 
@@ -66,10 +67,11 @@ if __name__ == '__main__':
     model = UNetLightning(
 
         # Architecture settings
-        network=LowRankUNet,
+        network=AirUNet,
         network_params={
             'compression': compression,
             'tensor_net_type': tensor_net_type,
+            'double_conv': AirDoubleConvAlt,
             'in_channels': 4,
             'out_channels': 3,
             'widths': (32, 64, 128, 256, 320),
@@ -115,10 +117,10 @@ if __name__ == '__main__':
         max_steps=100000,
         max_epochs=200,
         logger=tb_logger,
-        gpus=1,
+        gpus=2,
         #num_nodes=1,
         deterministic=True,
-        # distributed_backend='ddp',
+        distributed_backend='ddp',
         callbacks=[
             LearningRateMonitor(logging_interval="step"),
             PrintTableMetricsCallback(),

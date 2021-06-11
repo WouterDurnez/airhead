@@ -5,7 +5,7 @@
 #
 
 """
-Lightweight convolutional layers
+Lightweight convolutional layers in ALTERNATIVE implementation
 
  * CANONICAL POLYADIC FORMAT
  * TUCKER FORMAT
@@ -20,9 +20,11 @@ import opt_einsum as oe
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from fairscale.nn.checkpoint import checkpoint_wrapper
 from ptflops import get_model_complexity_info
 from sympy import Symbol, solve
 from torch import Tensor
+from torch.nn.functional import conv3d
 
 from models.baseline_unet import DoubleConv
 from utils.helper import log, hi
@@ -80,7 +82,7 @@ def count_lr_conv3d(module, _, y):
 # Low-rank 3D convolutional layer #
 ###################################
 
-class LowRankConv3D(nn.Module):
+class AirConv3DAlt(nn.Module):
 
     def __init__(self,
                  compression: int,
@@ -133,9 +135,9 @@ class LowRankConv3D(nn.Module):
         self.kernel_flops = self.path_info.opt_cost
 
         # Calculate actual compression rate
-        self.max_params = (self.kernel_size**3*self.in_channels*self.out_channels)
+        self.max_params = (self.kernel_size ** 3 * self.in_channels * self.out_channels)
         self.kernel_params = self._get_tensor_network_size()
-        self.actual_compression = self.max_params/self.kernel_params
+        self.actual_compression = self.max_params / self.kernel_params
 
     def _make_tensor_network(self):
         """
@@ -149,7 +151,7 @@ class LowRankConv3D(nn.Module):
         nodes = {}
 
         # We always need unfolded input
-        nodes['input'] = {
+        '''nodes['input'] = {
             "tensor": None,
             "shape": (1, self.in_channels,  # <-- (batch size, input channels,
                       1, 1, 1,  # <--  image height, width, depth,
@@ -158,7 +160,7 @@ class LowRankConv3D(nn.Module):
                      'c_in',
                      '-h', '-w', '-d',
                      'k_h', 'k_w', 'k_d']
-        }
+        }'''
 
         ##################################################
         # CANONICAL POLYADIC TENSOR DECOMPOSITION FORMAT #
@@ -186,7 +188,7 @@ class LowRankConv3D(nn.Module):
             """
 
             # First kernel factor matrices (U_kh, U_kd, U_kw)
-            for name in ['k_h', 'k_w', 'k_d']:
+            for name in ['-k_h', '-k_w', '-k_d']:
                 nodes[f'U_{name}'] = {
                     "tensor": Tensor(self.kernel_size, self.rank),
                     "shape": (self.kernel_size, self.rank),
@@ -197,7 +199,7 @@ class LowRankConv3D(nn.Module):
             nodes['U_c_in'] = {
                 "tensor": Tensor(self.in_channels, self.rank),
                 "shape": (self.in_channels, self.rank),
-                "legs": ['c_in', 'r']
+                "legs": ['-c_in', 'r']
             }
             nodes['U_c_out'] = {
                 "tensor": Tensor(self.rank, self.out_channels),
@@ -211,7 +213,8 @@ class LowRankConv3D(nn.Module):
 
         elif self.tensor_net_type in ['tucker']:
 
-            log(f'Creating Tucker tensor network [compression rate = {self.compression}].', verbosity=3, color='magenta')
+            log(f'Creating Tucker tensor network [compression rate = {self.compression}].', verbosity=3,
+                color='magenta')
 
             """
             For the CPD format, we need 6 nodes: 5 factor matrices and a core tensor: 
@@ -249,9 +252,9 @@ class LowRankConv3D(nn.Module):
             }
 
             # Now add kernel factor matrices (U_kh, U_kd, U_kw)
-            for kernel_dim, rank_leg, rank in [('k_h', 'r2', self.r2),
-                                               ('k_w', 'r3', self.r3),
-                                               ('k_d', 'r4', self.r4)]:
+            for kernel_dim, rank_leg, rank in [('-k_h', 'r2', self.r2),
+                                               ('-k_w', 'r3', self.r3),
+                                               ('-k_d', 'r4', self.r4)]:
                 nodes[f'U_{kernel_dim}'] = {
                     "tensor": Tensor(self.kernel_size, rank),
                     "shape": (self.kernel_size, rank),
@@ -262,7 +265,7 @@ class LowRankConv3D(nn.Module):
             nodes['U_c_in'] = {
                 "tensor": Tensor(self.in_channels, self.r1),
                 "shape": (self.in_channels, self.r1),
-                "legs": ['c_in', 'r1']
+                "legs": ['-c_in', 'r1']
             }
             nodes['U_c_out'] = {
                 "tensor": Tensor(self.r5, self.out_channels),
@@ -296,24 +299,24 @@ class LowRankConv3D(nn.Module):
             nodes['U_k_h'] = {
                 'tensor': Tensor(self.r1, self.kernel_size, self.r2),
                 'shape': (self.r1, self.kernel_size, self.r2),
-                'legs': ['r1', 'k_h', 'r2']
+                'legs': ['r1', '-k_h', 'r2']
             }
             nodes['U_k_w'] = {
                 'tensor': Tensor(self.r2, self.kernel_size, self.r3),
                 'shape': (self.r2, self.kernel_size, self.r3),
-                'legs': ['r2', 'k_w', 'r3']
+                'legs': ['r2', '-k_w', 'r3']
             }
             nodes['U_k_d'] = {
                 'tensor': Tensor(self.r3, self.kernel_size, self.r4),
                 'shape': (self.r3, self.kernel_size, self.r4),
-                'legs': ['r3', 'k_d', 'r4']
+                'legs': ['r3', '-k_d', 'r4']
             }
 
             # Now factor matrices for input and output channels
             nodes['U_c_in'] = {
                 "tensor": Tensor(self.in_channels, self.r1),
                 "shape": (self.in_channels, self.r1),
-                "legs": ['c_in', 'r1']
+                "legs": ['-c_in', 'r1']
             }
             nodes['U_c_out'] = {
                 "tensor": Tensor(self.r4, self.out_channels),
@@ -322,7 +325,7 @@ class LowRankConv3D(nn.Module):
             }
 
         # Add output edges
-        output_edges = ['-b', '-c_out', '-h', '-w', '-d']
+        output_edges = ['-c_out', '-c_in', '-k_h', '-k_w', '-k_d']
         # output_edges = [leg for node in nodes for legs in node['legs'] for leg in legs if leg.startswith('-')]
 
         '''print('NODES')
@@ -333,12 +336,13 @@ class LowRankConv3D(nn.Module):
     def _get_contraction(self):
         """ Get optimal contraction expression for our tensor network"""
 
-        args = [self.nodes['input']['shape'], self.nodes['input']['legs']]
+        # args = [self.nodes['input']['shape'], self.nodes['input']['legs']]
+        args = []
         # Go over input node, factor matrices
         for node_name, node_params in self.nodes.items():
-            if node_name != 'input':
-                args.append(node_params['shape'])
-                args.append(node_params['legs'])
+            # if node_name != 'input':
+            args.append(node_params['shape'])
+            args.append(node_params['legs'])
 
         # Add dangling output legs
         args.append(self.output_edges)
@@ -488,8 +492,8 @@ class LowRankConv3D(nn.Module):
             '''
             in_param = round(self.in_channels / self.S)
             out_param = round(self.out_channels / self.S)
-            return (in_param * self.kernel_size**3 * out_param) + \
-                   3 * self.kernel_size** 2 + \
+            return (in_param * self.kernel_size ** 3 * out_param) + \
+                   3 * self.kernel_size ** 2 + \
                    (self.in_channels * in_param) + \
                    (self.out_channels * out_param)
 
@@ -506,32 +510,28 @@ class LowRankConv3D(nn.Module):
 
     def forward(self, input: Tensor):
 
-        # First, get patches
-        patches = get_patches(input=input, kernel_dim=self.kernel_size, stride=self.stride, padding=self.padding)
+        # Get weights, which should be attributes of the layer (if registered correctly)
+        weights = [getattr(self, k) for k in self.nodes.keys()]
 
-        # Now get weights, which should be attributes of the layer (if registered correctly)
-        # Obviously don't count the input tensor
-        weights = [getattr(self, k) for k in self.nodes.keys() if k != 'input']
+        # Contract weight tensor
+        kernel_tensor = self.einsum_expression(*weights)
+        '''print(kernel_tensor.size())'''
 
-        # Contract
-        output = self.einsum_expression(patches, *weights)
-
-        # Add bias
-        if self.bias is not None:
-            output += self.bias[None, :, None, None, None]  # <-- cast across remaining dimensions
+        # Use pytorch's optimized conv3D function
+        output = conv3d(input=input, weight=kernel_tensor, bias=self.bias, stride=self.stride, padding=self.padding)
 
         return output
 
 
-# Double convolution block for low rank layers
-class LowRankDoubleConv(nn.Module):
+# Double convolution block for low rank layers using builtin conv3d
+class AirDoubleConvAlt(nn.Module):
 
     def __init__(
             self,
-            compression:int,
-            tensor_net_type:str,
-            in_channels:int,
-            out_channels:int,
+            compression: int,
+            tensor_net_type: str,
+            in_channels: int,
+            out_channels: int,
             num_groups=8,
             strides=(2, 1),
             activation=nn.LeakyReLU(inplace=True),
@@ -549,39 +549,42 @@ class LowRankDoubleConv(nn.Module):
         conv_par.setdefault('padding', 1)
 
         # Define inner block architecture
-        self.block = nn.Sequential(
+        self.block = checkpoint_wrapper(
+            module=nn.Sequential(
 
-            # Lightweight convolutional layer
-            LowRankConv3D(
-                compression=compression,
-                in_channels=in_channels,
-                out_channels=out_channels,
-                stride=strides[0],
-                tensor_net_type=tensor_net_type,
-                **conv_par
+                # Lightweight convolutional layer
+                AirConv3DAlt(
+                    compression=compression,
+                    in_channels=in_channels,
+                    out_channels=out_channels,
+                    stride=strides[0],
+                    tensor_net_type=tensor_net_type,
+                    **conv_par
+                ),
+
+                # Normalization layer (default minibatch of 8 instances)
+                nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
+
+                # Activation layer
+                activation,
+
+                # Lightweight convolutional layer
+                AirConv3DAlt(
+                    compression=compression,
+                    in_channels=out_channels,
+                    out_channels=out_channels,
+                    stride=strides[1],
+                    tensor_net_type=tensor_net_type,
+                    **conv_par
+                ),
+
+                # Normalization layer (default minibatch of 8 instances)
+                nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
+
+                # Activation layer
+                activation
             ),
-
-            # Normalization layer (default minibatch of 8 instances)
-            nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
-
-            # Activation layer
-            activation,
-
-            # Lightweight convolutional layer
-            LowRankConv3D(
-                compression=compression,
-                in_channels=out_channels,
-                out_channels=out_channels,
-                stride=strides[1],
-                tensor_net_type=tensor_net_type,
-                **conv_par
-            ),
-
-            # Normalization layer (default minibatch of 8 instances)
-            nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
-
-            # Activation layer
-            activation
+            offload_to_cpu=True
         )
 
     # Forward function (backward propagation is added automatically)
@@ -621,7 +624,7 @@ if __name__ == '__main__':
     layer_canon = LowRankConv3D(in_channels=in_channels, out_channels=out_channels,
                                 compression=compression,
                                 kernel_size=kernel_dim, padding=1, tensor_net_type='cpd')
-    layer_classic.to(device)
+    layer_canon.to(device)
 
     # Tucker layer
     layer_tucker = LowRankConv3D(in_channels=in_channels, out_channels=out_channels,
@@ -648,17 +651,17 @@ if __name__ == '__main__':
     # Double conv test
     double_conv_classic = DoubleConv(in_channels=in_channels, out_channels=out_channels)
     double_conv_classic_output = double_conv_classic(image)
-    double_conv_cpd = LowRankDoubleConv(compression=compression, tensor_net_type='cpd', in_channels=in_channels, out_channels=out_channels, num_groups=8)
+    double_conv_cpd = LowRankDoubleConv(compression=compression, tensor_net_type='cpd', in_channels=in_channels,
+                                        out_channels=out_channels, num_groups=8)
     double_conv_cpd_output = double_conv_cpd(image)
 
     assert double_conv_cpd_output.size() == double_conv_classic_output.size(), "Something went wrong with double conv CPD, output shapes don't match!"
 
     # Attempt to get flop count --> failed for tensor network versions!
-    for name, model in zip(('regular','cpd','tucker','tt'),(layer_classic, layer_canon, layer_tucker, layer_tt)):
+    for name, model in zip(('regular', 'cpd', 'tucker', 'tt'), (layer_classic, layer_canon, layer_tucker, layer_tt)):
         macs, params = get_model_complexity_info(model=model, input_res=(4, 128, 128, 128), as_strings=True,
                                                  print_per_layer_stat=False, verbose=False,
                                                  custom_modules_hooks={LowRankConv3D: count_lr_conv3d})
-        #flops = count_ops(model=model, input=image,verbose=False)
-        #print(name, '-->\tmacs: ', macs,'\tparams: ', params,'\tflops', flops)
+        # flops = count_ops(model=model, input=image,verbose=False)
+        # print(name, '-->\tmacs: ', macs,'\tparams: ', params,'\tflops', flops)
         print(name, 'macs', macs, 'params', params)
-

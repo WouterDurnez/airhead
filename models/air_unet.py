@@ -10,15 +10,16 @@ Lightweight U-Net
 import torch.nn as nn
 from torch import cat
 
-from layers.lightweight_conv import LowRankDoubleConv
+from layers.air_conv import AirDoubleConv
+from layers.air_conv_alt import AirDoubleConvAlt
 from models.baseline_unet import Upsample
 from utils.helper import log, set_params, count_params
 import torch
 from models.baseline_unet import UNet
+from fairscale.nn.checkpoint import checkpoint_wrapper
 
-
-# Full 3D-UNet architecture
-class LowRankUNet(nn.Module):
+# Low-Rank 3D-UNet architecture
+class AirUNet(nn.Module):
     def __init__(
             self,
             compression: int,
@@ -27,7 +28,7 @@ class LowRankUNet(nn.Module):
             out_channels,
             widths=(32, 64, 128, 256, 320),
             activation=nn.LeakyReLU(inplace=True),
-            double_conv=LowRankDoubleConv,
+            double_conv=AirDoubleConvAlt,
             double_conv_params=None,
             downsample='strided_convolution',
             up_par=None,
@@ -85,8 +86,8 @@ class LowRankUNet(nn.Module):
                                  activation=activation, conv_par=double_conv_params)
 
         # BRIDGE
-        self.bridge = LowRankDoubleConv(compression=self.compression, tensor_net_type=self.tensor_net_type,
-                                 in_channels=self.widths[4], out_channels=self.widths[4])
+        self.bridge = AirDoubleConv(compression=self.compression, tensor_net_type=self.tensor_net_type,
+                                    in_channels=self.widths[4], out_channels=self.widths[4])
 
         # DECODER
         """
@@ -173,14 +174,14 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Create appropriately dimensioned tensor with random values
-    dim = 128
+    dim = 96
     x = torch.rand(1, 4, dim, dim, dim)
     x.to(device)
     log(f'Input size (single image): {x.size()}')
 
     # Initialize model
-    lr_unet = LowRankUNet(compression=2,tensor_net_type='cpd',
-                        in_channels=4, out_channels=3, head=False, downsample='strided_convolution')
+    lr_unet = AirUNet(compression=2, tensor_net_type='cpd',
+                      in_channels=4, out_channels=3, head=False, downsample='strided_convolution')
 
     # Process example input
     #out = lr_unet(x)
