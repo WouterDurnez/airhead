@@ -18,11 +18,7 @@ This repository hosts the code for my thesis at KULeuven, in order to obtain the
 #### General
 
 #### Training
-  * (maybe) move parameters to dict-style **config file**  
+  * Complete!
   
 #### LIGHTWEIGHT LAYERS!
-  * Built, but issues training on the HPC. Likely reason: the triple use of `torch.Tensor.unfold`. 
-    
-    **Potential remedies**:
-    - Sharding (full or partial)
-    - Active checkpointing
+  * Built!
