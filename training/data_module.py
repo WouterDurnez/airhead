@@ -13,7 +13,7 @@ from os.path import join
 
 from monai.data import Dataset, DataLoader
 from pytorch_lightning import LightningDataModule
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold
 
 from utils.helper import *
 from training.transforms import *
@@ -70,9 +70,10 @@ class BraTSDataModule(LightningDataModule):
             self,
             data_dir=None,
             patch_dim: int = 128,
-            num_workers=0,
-            batch_size=1,
+            num_workers: int=0,
+            batch_size: int =1,
             validation_size=0.2,
+            fold_index:int=0
     ):
         super().__init__()
 
@@ -90,6 +91,9 @@ class BraTSDataModule(LightningDataModule):
 
         # Proportion (!) of dataset to reserve for validation
         self.validation_size = validation_size
+
+        # Index of split (fold)
+        self.fold_index = fold_index
 
         # Get all transforms
         self.training_transform = get_train_transform(patch_dim=self.patch_dim)
@@ -110,15 +114,16 @@ class BraTSDataModule(LightningDataModule):
         # Get data paths
         self.data = get_data(self.data_dir)
 
-        # Split data into training and validation
-        (
-            self.training_data,
-            self.validation_data,
-        ) = train_test_split(
-            self.data,
-            test_size=self.validation_size,
-            random_state=616,
-        )
+        # 5-fold validation
+        splitter = KFold(n_splits=5, shuffle=True, random_state=616)
+        splits = splitter.split(self.data)
+
+        # Store all folds (loop over generator)
+        self.folds = [next(splits) for _ in range(5)]
+
+        # Get training and validation data, depending on fold index
+        self.training_data = [self.data[idx] for idx in self.folds[self.fold_index][0]]
+        self.validation_data = [self.data[idx] for idx in self.folds[self.fold_index][1]]
 
         # Performance metrics will be calculated on the validation dataset as well
         self.test_data = self.validation_data
@@ -200,6 +205,18 @@ if __name__ == '__main__':
 
     # Set path to directories
     # Use helper.set_params
+    hi('Dry run for BraTS data module')
 
-    brats = BraTSDataModule(data_dir=DATA_DIR)
+    '''data_dir = join(DATA_DIR, 'MICCAI_BraTS2020_TrainingData')
+    data = get_data(root_dir=data_dir)
+
+    splitter = KFold(n_splits=5, shuffle=True, random_state=616)
+    splitter.split(get_data(data_dir))
+
+    folds = [next(splitter
+                  .split(get_data(data_dir))) for i in range(5)]
+
+    train_data = [data[idx] for idx in folds[0][0]]'''
+
+    brats = BraTSDataModule(data_dir=join(DATA_DIR, 'MICCAI_BraTS2020_TrainingData'), fold_index=4)
     brats.setup()
