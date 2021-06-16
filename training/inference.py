@@ -71,7 +71,8 @@ def test_inference(input: torch.Tensor, model: nn.Module, roi_dim:int = 128, **k
 
     # Generate output using sliding window (sized 128^3)
     output = sliding_window_inference(
-        inputs=input, roi_size=(roi_dim, roi_dim, roi_dim), sw_batch_size=1, predictor=model, **kwargs
+        inputs=input, roi_size=(roi_dim, roi_dim, roi_dim),
+        sw_batch_size=4, overlap=.5, predictor=model, **kwargs
     )
 
     # Post transforms
