@@ -278,7 +278,7 @@ if __name__ == '__main__':
     tuning_cpd, tuning_tt, tuning_tucker = [], [], []
     cpd_params, tt_params, tucker_params = [], [], []
     theoretical_params = []
-    compression_rates = range(5,100,5)
+    compression_rates = range(2,100)
     #compression_rates = (1,5,10,50,100)
     for comp in compression_rates:
         theoretical_params.append(max_param/comp)
