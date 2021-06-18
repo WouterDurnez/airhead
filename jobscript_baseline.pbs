@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 #PBS -l nodes=1:ppn=8:gpus=1
-#PBS -l walltime=24:00:00
+#PBS -l walltime=50:00:00
 
-#PBS -N unet_baseline_1gpu
+#PBS -N unet_baseline
 #PBS -m abe
 
 cd $PBS_O_WORKDIR
@@ -11,4 +11,4 @@ cd $PBS_O_WORKDIR
 export PATH="${VSC_DATA}/miniconda3/bin:${PATH}"
 source activate airenv
 
-python train_baseline.py
+python train_baseline.py --fold ${FOLD}
