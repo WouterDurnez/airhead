@@ -7,7 +7,7 @@
 """
 Main training script
 """
-
+import argparse
 from os.path import join
 from pprint import PrettyPrinter
 
@@ -33,11 +33,19 @@ pp = PrettyPrinter()
 
 if __name__ == '__main__':
     # Let's go
-    hlp.hi("Training baseline U-Net")
+    hlp.hi("Training baseline U-Net", log_dir='../logs_cv')
 
-    # Name
-    model_name = 'unet_baseline'
-    version = 99
+    # Get arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--fold', help='Fold index')
+    args = parser.parse_args()
+
+    log(f'Fold index:    {args.fold}', color='green')
+
+    # Parameters
+    version = 0
+    fold_index = int(args.fold)
+    model_name = f'unet_baseline_f{fold_index}'
 
     # Set data directory
     data_dir = hlp.DATA_DIR
@@ -78,7 +86,7 @@ if __name__ == '__main__':
 
         # Test inference method
         test_inference=test_inference,
-        test_inference_params=None,
+        test_inference_params={'overlap':.5},
     )
 
     # Load checkpoint
@@ -87,9 +95,9 @@ if __name__ == '__main__':
     # Initialize data module
     log("Initializing data module")
     brats = BraTSDataModule(data_dir=join(data_dir,"MICCAI_BraTS2020_TrainingData"),
-                            num_workers=0,
+                            num_workers=8,
                             batch_size=1,
-                            validation_size=.2)
+                            fold_index=fold_index)
     brats.setup()
 
     # Initialize logger
@@ -98,13 +106,12 @@ if __name__ == '__main__':
     # Initialize trainer
     log("Initializing trainer")
     trainer = Trainer(
-        max_steps=100000,
-        max_epochs=200,
+        max_epochs=500,
         logger=tb_logger,
         gpus=-1,
         #num_nodes=8,
         deterministic=True,
-        distributed_backend='ddp',
+        #distributed_backend='ddp',
         callbacks=[
             LearningRateMonitor(logging_interval="step"),
             PrintTableMetricsCallback(),
@@ -118,7 +125,7 @@ if __name__ == '__main__':
                 datamodule=brats)
 
     # Additional checkpoint (just in case)
-    trainer.save_checkpoint(join(snap_dir, f'final_{model_name}_v{version}.ckpt'))
+    trainer.save_checkpoint(join(snap_dir, f'final_{model_name}_v{version}_fold{fold_index}.ckpt'))
 
     # Test
     log("Evaluating model")
@@ -138,4 +145,4 @@ if __name__ == '__main__':
             'params': params}
 
     # Save test results
-    np.save(file=join(result_dir, f'{model_name}_v{version}.npy'), arr=results)
+    np.save(file=join(result_dir, f'{model_name}_v{version}_fold{fold_index}.npy'), arr=results)
