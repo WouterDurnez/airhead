@@ -26,7 +26,7 @@ from torch import Tensor
 from torch.nn.functional import conv3d
 
 from models.baseline_unet import DoubleConv
-from utils.helper import log, hi
+from utils.helper import log, hi, TENSOR_NET_TYPES
 
 pp = PrettyPrinter(4)
 
@@ -106,8 +106,7 @@ class AirConv3DAlt(nn.Module):
         self.bias = bias
         self.tensor_net_type = tensor_net_type
 
-        types = ['cp', 'cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt']
-        assert self.tensor_net_type in types, f"Choose a valid tensor network {types}"
+        assert self.tensor_net_type in TENSOR_NET_TYPES, f"Choose a valid tensor network {types}"
 
         self.__name__ = f'{self.tensor_net_type.lower()}_low_rank_conv'
 
@@ -276,7 +275,8 @@ class AirConv3DAlt(nn.Module):
         # TENSOR TRAIN FORMAT #
         #######################
 
-        elif self.tensor_net_type in ['train', 'tensor-train', 'tt']:
+        elif self.tensor_net_type in ['train', 'tensor-train', 'tt',
+                                      'train2', 'tensor-train2', 'tt2']:
 
             log(f'Creating Tensor Train network [compression rate = {self.compression}].', verbosity=3, color='magenta')
 
@@ -284,15 +284,23 @@ class AirConv3DAlt(nn.Module):
             For the TT format, we need 5 nodes:
              * 1 3rd-order tensor node for each of the kernel dimensions: U_k_h, U_k_w, U_kd,
              * 1 factor matrix for the input channels, 1 for the output channels: U_c_in and U_c_out
-             
+
               O - r1 - O - r2 - O - r3 - O - r4 - O
               |        |        |        |        |
              c_in     k_h      k_w      k_d      c_out
+             
+            Special case (tt2): middle bond dimensions (r2 and r3 set to 3)
             """
 
             # We tune the bond dimensions (assumed equal across the 'train')
             self.r = round(self._get_tuning_par()) if round(self._get_tuning_par()) > 0 else 1
-            self.r1 = self.r2 = self.r3 = self.r4 = self.r
+
+            # Set bond dimensions, depending on type
+            if self.tensor_net_type.endswith("2"):
+                self.r1 = self.r4 = self.r
+                self.r2 = self.r3 = 3
+            else:
+                self.r1 = self.r2 = self.r3 = self.r4 = self.r
 
             # First kernel factor matrices (U_kh, U_kd, U_kw)
             nodes['U_k_h'] = {
@@ -402,7 +410,7 @@ class AirConv3DAlt(nn.Module):
         # TUCKER #
         ##########
 
-        if self.tensor_net_type in ['tucker']:
+        elif self.tensor_net_type in ['tucker']:
 
             '''
             tucker params:
@@ -434,7 +442,7 @@ class AirConv3DAlt(nn.Module):
         # TENSOR TRAIN #
         ################
 
-        if self.tensor_net_type in ['tt', 'tensor-train', 'train']:
+        elif self.tensor_net_type in ['tt', 'tensor-train', 'train']:
 
             '''
             tensor train params:
@@ -453,6 +461,30 @@ class AirConv3DAlt(nn.Module):
                 evaluated = s.evalf()
                 if evaluated > 0:
                     evaluated_solutions.append(evaluated)
+
+            # Check if unique positive, real solution
+            assert len(evaluated_solutions) == 1, 'Too many solutions!'
+
+            return evaluated_solutions[0]
+
+        ##################
+        # TENSOR TRAIN 2 #
+        ##################
+        elif self.tensor_net_type in ['tt2', 'tensor-train2', 'train2']:
+            '''
+            tensor train params:
+            r * in_channels + r*3*3 + 3*3*3 + r*3*3 + r * out_channels
+
+            compression = max_params / tt_params     
+            '''
+            r = Symbol('r', real=True, positive=True)
+            expr =  r * self.in_channels + r * 3 * 3 + 3 * 3 * 3 + r * 3 * 3 + r * self.out_channels
+            solutions = solve(max_params /expr - self.compression,r)
+
+            # Check for appropriate S values
+            evaluated_solutions = []
+            for s in solutions:
+                evaluated_solutions.append(s.evalf())
 
             # Check if unique positive, real solution
             assert len(evaluated_solutions) == 1, 'Too many solutions!'
@@ -506,6 +538,17 @@ class AirConv3DAlt(nn.Module):
             r * (in_channels + r*(3+3+3) + out_channels)
             '''
             return self.r * (self.in_channels + self.r * 9 + self.out_channels)
+
+        ##################
+        # TENSOR TRAIN 2 #
+        ##################
+
+        if self.tensor_net_type in ['tt2', 'tensor-train2', 'train2']:
+            '''
+            tensor train 2 params:
+            r * in_channels + r*3*3 + 3*3*3 + r*3*3 + r * out_channels
+            '''
+            return self.r * self.in_channels + self.r * 3 * 3 + 3 * 3 * 3 + self.r * 3 * 3 + self.r * self.out_channels
 
     def forward(self, input: Tensor):
 

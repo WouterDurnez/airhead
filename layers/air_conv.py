@@ -25,7 +25,7 @@ from sympy import Symbol, solve
 from torch import Tensor
 
 from models.baseline_unet import DoubleConv
-from utils.helper import log, hi
+from utils.helper import log, hi, TENSOR_NET_TYPES
 
 pp = PrettyPrinter(4)
 
@@ -71,7 +71,7 @@ def count_lr_conv3d(module, _, y):
     # rather than output_elements
     total_ops = output_voxels_per_channel * kernel_flops / 2 + bias_flops
 
-    print(f'{module.__name__}: kernel ops {kernel_flops} - bias ops {bias_flops} \t TOTAL {total_ops}')
+    # print(f'{module.__name__}: kernel ops {kernel_flops} - bias ops {bias_flops} \t TOTAL {total_ops}')
 
     module.__flops__ += int(total_ops)
 
@@ -106,8 +106,7 @@ class AirConv3D(nn.Module):
         self.padding = padding
         self.bias = bias
 
-        types = ['cp', 'cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt']
-        assert self.tensor_net_type in types, f"Choose a valid tensor network {types}"
+        assert self.tensor_net_type in TENSOR_NET_TYPES, f"Choose a valid tensor network [{TENSOR_NET_TYPES}]"
 
         self.__name__ = f'{self.tensor_net_type.lower()}_low_rank_conv'
 
@@ -276,23 +275,33 @@ class AirConv3D(nn.Module):
         # TENSOR TRAIN FORMAT #
         #######################
 
-        elif self.tensor_net_type in ['train', 'tensor-train', 'tt']:
+        elif self.tensor_net_type in ['train', 'tensor-train', 'tt',
+                                      'train2', 'tensor-train2', 'tt2']:
 
-            log(f'Creating Tensor Train network [compression rate = {self.compression}].', verbosity=3, color='magenta')
+            log(f'Creating Tensor Train network {("(alt version)" if self.tensor_net_type.endswith("2") else "")}'
+                f' [compression rate = {self.compression}].', verbosity=3, color='magenta')
 
             """
             For the TT format, we need 5 nodes:
              * 1 3rd-order tensor node for each of the kernel dimensions: U_k_h, U_k_w, U_kd,
              * 1 factor matrix for the input channels, 1 for the output channels: U_c_in and U_c_out
-             
+
               O - r1 - O - r2 - O - r3 - O - r4 - O
               |        |        |        |        |
              c_in     k_h      k_w      k_d      c_out
+             
+            Special case (tt2): middle bond dimensions (r2 and r3 set to 3)
             """
 
             # We tune the bond dimensions (assumed equal across the 'train')
             self.r = round(self._get_tuning_par()) if round(self._get_tuning_par()) > 0 else 1
-            self.r1 = self.r2 = self.r3 = self.r4 = self.r
+
+            # Set bond dimensions, depending on type
+            if self.tensor_net_type.endswith("2"):
+                self.r1 = self.r4 = self.r
+                self.r2 = self.r3 = 3
+            else:
+                self.r1 = self.r2 = self.r3 = self.r4 = self.r
 
             # First kernel factor matrices (U_kh, U_kd, U_kw)
             nodes['U_k_h'] = {
@@ -323,12 +332,53 @@ class AirConv3D(nn.Module):
                 "legs": ['r4', '-c_out']  # <-- output channels becomes dangling edge after contraction
             }
 
+        '''
+        #########################
+        # TENSOR TRAIN FORMAT 2 #
+        #########################
+
+        elif self.tensor_net_type in ['train2', 'tensor-train2', 'tt2']:
+
+            log(f'Creating Tensor Train network [compression rate = {self.compression}].', verbosity=3, color='magenta')
+
+            """
+            The TT2 format carbon copies the TT format, with one different: the middle two bond dimensions are set to 3.
+            """
+
+            # We tune the bond dimensions (assumed equal across the 'train')
+            self.r = self.r1 = self.r4 = round(self._get_tuning_par()) if round(self._get_tuning_par()) > 0 else 1
+
+            # First kernel factor matrices (U_kh, U_kd, U_kw)
+            nodes['U_k_h'] = {
+                'tensor': Tensor(self.r1, self.kernel_size, 3),
+                'shape': (self.r1, self.kernel_size, 3),
+                'legs': ['r1', 'k_h', 'r2']
+            }
+            nodes['U_k_w'] = {
+                'tensor': Tensor(3, self.kernel_size, 3),
+                'shape': (3, self.kernel_size, 3),
+                'legs': ['r2', 'k_w', 'r3']
+            }
+            nodes['U_k_d'] = {
+                'tensor': Tensor(3, self.kernel_size, self.r4),
+                'shape': (3, self.kernel_size, self.r4),
+                'legs': ['r3', 'k_d', 'r4']
+            }
+
+            # Now factor matrices for input and output channels
+            nodes['U_c_in'] = {
+                "tensor": Tensor(self.in_channels, self.r1),
+                "shape": (self.in_channels, self.r1),
+                "legs": ['c_in', 'r1']
+            }
+            nodes['U_c_out'] = {
+                "tensor": Tensor(self.r4, self.out_channels),
+                "shape": (self.r4, self.out_channels),
+                "legs": ['r4', '-c_out']  # <-- output channels becomes dangling edge after contraction
+            }'''
+
         # Add output edges
         output_edges = ['-b', '-c_out', '-h', '-w', '-d']
-        # output_edges = [leg for node in nodes for legs in node['legs'] for leg in legs if leg.startswith('-')]
-
-        '''print('NODES')
-        pp.pprint(nodes)'''
 
         return nodes, output_edges
 
@@ -401,7 +451,7 @@ class AirConv3D(nn.Module):
         # TUCKER #
         ##########
 
-        if self.tensor_net_type in ['tucker']:
+        elif self.tensor_net_type in ['tucker']:
 
             '''
             tucker params:
@@ -433,7 +483,7 @@ class AirConv3D(nn.Module):
         # TENSOR TRAIN #
         ################
 
-        if self.tensor_net_type in ['tt', 'tensor-train', 'train']:
+        elif self.tensor_net_type in ['tt', 'tensor-train', 'train']:
 
             '''
             tensor train params:
@@ -452,6 +502,30 @@ class AirConv3D(nn.Module):
                 evaluated = s.evalf()
                 if evaluated > 0:
                     evaluated_solutions.append(evaluated)
+
+            # Check if unique positive, real solution
+            assert len(evaluated_solutions) == 1, 'Too many solutions!'
+
+            return evaluated_solutions[0]
+
+        ##################
+        # TENSOR TRAIN 2 #
+        ##################
+        elif self.tensor_net_type in ['tt2', 'tensor-train2', 'train2']:
+            '''
+            tensor train params:
+            r * in_channels + r*3*3 + 3*3*3 + r*3*3 + r * out_channels
+
+            compression = max_params / tt_params     
+            '''
+            r = Symbol('r', real=True, positive=True)
+            expr =  r * self.in_channels + r * 3 * 3 + 3 * 3 * 3 + r * 3 * 3 + r * self.out_channels
+            solutions = solve(max_params /expr - self.compression,r)
+
+            # Check for appropriate S values
+            evaluated_solutions = []
+            for s in solutions:
+                evaluated_solutions.append(s.evalf())
 
             # Check if unique positive, real solution
             assert len(evaluated_solutions) == 1, 'Too many solutions!'
@@ -505,6 +579,18 @@ class AirConv3D(nn.Module):
             r * (in_channels + r*(3+3+3) + out_channels)
             '''
             return self.r * (self.in_channels + self.r * 9 + self.out_channels)
+
+
+        ##################
+        # TENSOR TRAIN 2 #
+        ##################
+
+        if self.tensor_net_type in ['tt2', 'tensor-train2', 'train2']:
+            '''
+            tensor train 2 params:
+            r * in_channels + r*3*3 + 3*3*3 + r*3*3 + r * out_channels
+            '''
+            return self.r*self.in_channels + self.r*3*3 + 3*3*3 + self.r*3*3 + self.r*self.out_channels
 
     def forward(self, input: Tensor):
 
@@ -617,7 +703,7 @@ if __name__ == '__main__':
     layer_classic.to(device)
 
     # Low-rank layers
-    compression = 20
+    compression = 5
 
     # Canonical layer
     layer_canon = AirConv3D(in_channels=in_channels, out_channels=out_channels,
@@ -648,14 +734,14 @@ if __name__ == '__main__':
     assert tt_output.size() == classic_output.size(), "Something went wrong with TT format, output shapes don't match!"
 
     # Double conv test
-    double_conv_classic = DoubleConv(in_channels=in_channels, out_channels=out_channels)
+    """double_conv_classic = DoubleConv(in_channels=in_channels, out_channels=out_channels)
     double_conv_classic_output = double_conv_classic(image)
     double_conv_cpd = AirDoubleConv(compression=compression, tensor_net_type='cpd', in_channels=in_channels,
                                     out_channels=out_channels, num_groups=8)
     double_conv_cpd_output = double_conv_cpd(image)
 
     assert double_conv_cpd_output.size() == double_conv_classic_output.size(), "Something went wrong with double conv CPD, output shapes don't match!"
-
+    """
     # Attempt to get flop count --> failed for tensor network versions!
     for name, model in zip(('regular', 'cpd', 'tucker', 'tt'), (layer_classic, layer_canon, layer_tucker, layer_tt)):
         macs, params = get_model_complexity_info(model=model, input_res=(4, 128, 128, 128), as_strings=True,
