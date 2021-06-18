@@ -72,7 +72,7 @@ class BraTSDataModule(LightningDataModule):
             patch_dim: int = 128,
             num_workers: int=0,
             batch_size: int =1,
-            validation_size=0.2,
+            n_folds=5,
             fold_index:int=0
     ):
         super().__init__()
@@ -89,8 +89,8 @@ class BraTSDataModule(LightningDataModule):
         # Batch size during training (usually minibatch of 1 or 2)
         self.batch_size = batch_size
 
-        # Proportion (!) of dataset to reserve for validation
-        self.validation_size = validation_size
+        # Number of folds to use in crossvalidation scheme
+        self.n_folds = n_folds
 
         # Index of split (fold)
         self.fold_index = fold_index
@@ -115,7 +115,7 @@ class BraTSDataModule(LightningDataModule):
         self.data = get_data(self.data_dir)
 
         # 5-fold validation
-        splitter = KFold(n_splits=5, shuffle=True, random_state=616)
+        splitter = KFold(n_splits=self.n_folds, shuffle=True, random_state=616)
         splits = splitter.split(self.data)
 
         # Store all folds (loop over generator)
