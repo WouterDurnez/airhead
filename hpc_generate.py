@@ -14,7 +14,7 @@ if __name__ == '__main__':
     x 6 compression rates), amounting to a total of 24 jobs.
     """
 
-    for fold in range(5):
+    '''for fold in range(5):
 
         with open(f'jobscripts_batch_fold{fold}.sh', 'w') as f:
 
@@ -28,5 +28,17 @@ if __name__ == '__main__':
 
                 for type in ('cpd','tucker','tt','tt2'):
                     command = f'qsub jobscript_air.pbs -v TYPE={type},FOLD={fold},COMP={comp}\n'
-                    f.write(command)
+                    f.write(command)'''
+    fold = 0
+    with open(f'jobscripts_batch_test_fold{fold}.sh', 'w') as f:
+        f.write('#!/bin/bash\n')
 
+        f.write(f'\n#FOLD {fold}\n')
+
+        for comp in (2, 5, 10, 20, 50, 100):
+
+            f.write(f'#COMPRESSION {comp}\n')
+
+            for type in ('cpd', 'tucker', 'tt', 'tt2'):
+                command = f'qsub jobscript_test_air.pbs -v TYPE={type},FOLD={fold},COMP={comp}\n'
+                f.write(command)
