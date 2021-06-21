@@ -21,9 +21,9 @@ import utils.helper as hlp
 from training.data_module import BraTSDataModule
 from utils.helper import set_dir, log
 
-colors = sns.color_palette('Reds', n_colors=3)
-colors = ('red','green','yellow')
-
+#colors = sns.color_palette('Reds', n_colors=3)
+#colors = ('red','green','yellow')
+colors = [ "#FF7251", "#52BEEC", "#FFCE51",]
 
 def show_subject(sample: dict, axis: int = 0, slice: int = 100):
     # Do we have predictions?
@@ -36,22 +36,23 @@ def show_subject(sample: dict, axis: int = 0, slice: int = 100):
 
     # Viz parameters
     channels = ['T1', 'T1 post-contrast', 'T2', 'FLAIR']
+    alpha = .65
 
     # Set some aesthetic parameters
-    sns.set_theme(font_scale=1.3, font='serif')
+    sns.set_theme(font_scale=1.3, font='utopia')
 
     # Make plot
     rows = 3 if p else 2
-    fig, ax = plt.subplots(rows, 4, dpi=300, figsize=(16, 12))
+    fig, ax = plt.subplots(rows, 4, dpi=300, figsize=(12, 12))
 
     # Define color map
     cmap_mask = ListedColormap(['none', colors[0], colors[1], colors[2]])
 
     # Add labels
-    ax[0, 0].set_ylabel('Image')
-    ax[1, 0].set_ylabel('Target')
+    ax[0, 0].set_ylabel('Image', fontdict={'weight':'bold'})
+    ax[1, 0].set_ylabel('Target', fontdict={'weight':'bold'})
     if p:
-        ax[2, 0].set_ylabel('Prediction')
+        ax[2, 0].set_ylabel('Prediction', fontdict={'weight':'bold'})
 
     # Plot all images and masks
     for index, channel in enumerate(channels):
@@ -60,11 +61,11 @@ def show_subject(sample: dict, axis: int = 0, slice: int = 100):
         ax[0, index].set_title(channel, fontweight='bold')
         # Second row with target masks
         ax[1, index].imshow(img[index, ...], cmap='gray')
-        ax[1, index].imshow(msk, alpha=.7, cmap=cmap_mask)
+        ax[1, index].imshow(msk, alpha=alpha, cmap=cmap_mask)
         # Bottom row with predicted masks
         if p:
             ax[2, index].imshow(img[index, ...], cmap='gray')
-            ax[2, index].imshow(pre, alpha=.7, cmap=cmap_mask)
+            ax[2, index].imshow(pre, alpha=alpha, cmap=cmap_mask)
 
     plt.setp(ax, xticks=[], xticklabels=[], yticks=[], yticklabels=[])
     plt.suptitle(f'BraTS dataset - subject {sample["id"]}', fontweight='bold')
@@ -73,6 +74,8 @@ def show_subject(sample: dict, axis: int = 0, slice: int = 100):
     #                    zip((colors[0], colors[2], colors[1]), ('ET', 'TC', 'WT'))])
 
     plt.tight_layout()
+
+    plt.savefig('baseline_pred.pdf')
     plt.show()
 
 
@@ -92,12 +95,11 @@ if __name__ == '__main__':
     log("Initializing data module")
     brats = BraTSDataModule(data_dir=join(hlp.DATA_DIR, "MICCAI_BraTS2020_TrainingData"),
                             num_workers=8,
-                            batch_size=1,
-                            validation_size=.2)
+                            batch_size=1)
     brats.setup()
 
     # Get an image
-    idx = 34  # High grade ganglioma 3, Low-grade ganglioma 319
+    idx = 15  # High grade ganglioma 3, Low-grade ganglioma 319
     sample = brats.visualization_set[idx]
 
     # Get prediction
