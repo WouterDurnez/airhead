@@ -11,49 +11,40 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-def process_results(results: dict, type:str, compression:int, macs:int, params:int):
+def process_results(results: dict, type:str, fold:int, compression:int, macs:int, params:int):
     """Calculate mean of main metrics"""
-    dice = []
-    dice_et = []
-    dice_tc = []
-    dice_wt = []
-    hd = []
-    hd_et = []
-    hd_tc = []
-    hd_wt = []
+
+    all_data = []
 
     for res in results:
-        dice.append(res['test_dice_metric'])
-        dice_et.append(res['test_dice_et'])
-        dice_tc.append(res['test_dice_tc'])
-        dice_wt.append(res['test_dice_wt'])
-        hd.append(res['test_hd_metric'])
-        hd_et.append(res['test_hd_et'])
-        hd_tc.append(res['test_hd_tc'])
-        hd_wt.append(res['test_hd_wt'])
 
-    return {
+        subject_data = {
+            'type': type,
+            'compression': compression,
+            'fold':fold,
+            'macs': macs,
+            'params': params,
+            'id': res['id'],
+            'dice': res['test_dice_metric'],
+            'dice_et': res['test_dice_et'],
+            'dice_tc': res['test_dice_tc'],
+            'dice_wt': res['test_dice_wt'],
+            'hd': res['test_hd_metric'],
+            'hd_et': res['test_hd_et'],
+            'hd_tc': res['test_hd_tc'],
+            'hd_wt': res['test_hd_wt'],
+        }
 
-        'type': type,
-        'compression': compression,
+        subject_df = pd.Series(subject_data)
+        all_data.append(subject_df)
 
-        'macs':macs,
-        'params':params,
+    all_df = pd.DataFrame(all_data)
 
-        'dice': np.mean(dice),
-        'dice_et': np.mean(dice_et),
-        'dice_tc': np.mean(dice_tc),
-        'dice_wt': np.mean(dice_wt),
-
-        'hd': np.mean(hd),
-        'hd_et': np.mean(hd_et),
-        'hd_tc': np.mean(hd_tc),
-        'hd_wt': np.mean(hd_wt),
-    }
+    return all_df
 
 
 if __name__ == '__main__':
-    hlp.hi('Analysis', log_dir='../../logs_hpc')
+    hlp.hi('Analysis', log_dir='../../logs_cv')
 
     # Get all results files
     files = glob(join(hlp.LOG_DIR, 'results','*','*'))
@@ -63,30 +54,33 @@ if __name__ == '__main__':
     flops_params = np.load(join(hlp.LOG_DIR, 'model_flops.npy'), allow_pickle=True).item()
 
     # Process all results
-    processed_results = {}
+    processed_results = []
     for f in files:
         if f.__contains__('baseline'):
-            name = type = 'baseline'
+            model_name = type = 'baseline'
             compression=1
+            fold=int(f[-5])
             macs = flops_params['baseline']['macs']
             params = flops_params['baseline']['params']
         else:
-            name = f.split('/')[-1][:-4]
-            compression = int(name.split('_')[-1][1:])
-            type = name.split('_')[-2]
+            model_name = f.split('/')[-1]
+            compression = int(model_name.split('_')[-2][1:])
+            fold=int(model_name.split('_')[-1][4])
+            type = model_name.split('_')[1]
+            if type == 'cpd':
+                type = 'cp'
             macs = flops_params[type][compression]['macs']
             params = flops_params[type][compression]['params']
 
         results = np.load(f, allow_pickle=True)
-        processed_results[name] = process_results(results, type=type, compression=compression, macs=macs, params=params)
+        results_df = process_results(results, type=type, fold=fold, compression=compression, macs=macs, params=params)
 
+        processed_results.append(results_df)
     # Create df
-    metrics = pd.DataFrame.from_dict(processed_results,orient='index').\
-        reset_index().\
-        rename(columns={'index':'model'})
+    metrics = pd.concat(processed_results)
 
     # Add some ratio variables
-    metrics['dice_macs'] = metrics.dice/metrics.macs
+    '''metrics['dice_macs'] = metrics.dice/metrics.macs
     metrics['dice_params'] = metrics.dice/metrics.params
 
     # Visualize
@@ -143,4 +137,4 @@ if __name__ == '__main__':
     sns.barplot(data=hd_data, x='metric', y='value', ax=ax[1])
     ax[0].set_ylim(.5,.8)
     plt.tight_layout()
-    plt.show()
+    plt.show()'''
