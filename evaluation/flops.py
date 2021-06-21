@@ -13,7 +13,7 @@ from models.air_unet import AirUNet
 from layers.air_conv import count_lr_conv3d, AirConv3D
 from ptflops import get_model_complexity_info
 from pprint import PrettyPrinter
-from utils.helper import log, hi, LOG_DIR
+from utils.helper import log, hi, LOG_DIR, TENSOR_NET_TYPES
 from os.path import join
 import numpy as np
 pp = PrettyPrinter()
@@ -21,7 +21,7 @@ pp = PrettyPrinter()
 
 if __name__ == '__main__':
 
-    hi('Flop/mac counter', verbosity=1)
+    hi('Flop/mac counter', verbosity=1, log_dir='../../logs_cv')
 
     result_dir = join(LOG_DIR, 'results')
 
@@ -51,7 +51,7 @@ if __name__ == '__main__':
     ############
 
     # Loop over types and compression rates
-    for tensor_net_type in ('cp', 'tt', 'tucker'):
+    for tensor_net_type in ('cp', 'tt', 'tt2', 'tucker'):
 
         info[tensor_net_type] = {}
 
