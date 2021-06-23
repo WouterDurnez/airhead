@@ -99,7 +99,7 @@ if __name__ == '__main__':
     brats.setup()
 
     # Get an image
-    idx = 15  # High grade ganglioma 3, Low-grade ganglioma 319
+    idx = 15      # Sample id: 'BraTS20_Training_102'
     sample = brats.visualization_set[idx]
 
     # Get prediction
