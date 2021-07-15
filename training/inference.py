@@ -8,6 +8,7 @@
 Inference functions
 i.e. pass (unseen) input through the model and see what it says
 """
+from itertools import product
 from os.path import join
 
 import SimpleITK as sitk
@@ -15,14 +16,15 @@ from monai.inferers import sliding_window_inference
 from monai.transforms import Activations, AsDiscrete
 from monai.transforms import Compose
 from torch import optim
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
+from tqdm import tqdm
 
 import utils.helper as hlp
-from training.data_module import BraTSDataModule
 from models.baseline_unet import UNet
+from training.data_module import BraTSDataModule
 from training.lightning import UNetLightning
 from training.losses import *
-from utils.utils import WarmupCosineSchedule
-from tqdm import tqdm
+
 
 ####################################################
 # Inference functions for validation and test data #
@@ -117,62 +119,80 @@ def predict(model: torch.nn.Module, sample: dict, device: torch.device, model_na
 
 
 if __name__ == '__main__':
-    hlp.hi('Prediction test')
+    hlp.hi('Prediction test', log_dir='../../logs_cv')
 
     # Set parameters
-    model_name = 'unet_baseline'
-    version = 6
-    write_dir = join(hlp.DATA_DIR, 'predictions', model_name, f'v{version}')
-    hlp.set_dir(write_dir)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    fold_index = 0
+    #model_name = f'unet_baseline_f{fold_index}'
 
-    # Load model
-    model = UNetLightning(
+    models = [('baseline',0)]
+    models += list(product(
+        ('cpd','tt','tt2','tucker'),
+        (2,5,10,20,50,100)
+    ))
 
-        # Architecture settings
-        network=UNet,
-        network_params={
-            'in_channels': 4,
-            'out_channels': 3,
-            'widths': (32, 64, 128, 256, 320),
-            'head': False},
 
-        # Loss and metrics
-        loss=dice_loss,
-        metrics=[dice_metric, dice_et, dice_tc, dice_wt,
-                 hd_metric, hd_et, hd_tc, hd_wt],
+    for type, version in tqdm(models, desc='Predicting segmentation'):
 
-        # Optimizer
-        optimizer=optim.AdamW,
-        optimizer_params={'lr': 1e-4, 'weight_decay': 1e-5},
+        model_name = f'unet_{type}_f{fold_index}'
+        write_dir = join(hlp.DATA_DIR, 'predictions')
+        hlp.set_dir(write_dir)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        # Learning rate scheduler
-        scheduler=WarmupCosineSchedule,
-        scheduler_config={'interval': 'step'},
-        scheduler_params={'warmup_steps': 3 * 3e2, 'total_steps': 1e5},
+        # Load model
+        model = UNetLightning(
 
-        # Inference method
-        inference=val_inference,
-        inference_params=None,
+            # Architecture settings
+            network=UNet,
+            network_params={
+                'in_channels': 4,
+                'out_channels': 3,
+                'widths': (32, 64, 128, 256, 320),
+                'head': False},
 
-        # Test inference method
-        test_inference=test_inference,
-        test_inference_params=None, )
+            # Loss and metrics
+            loss=dice_loss,
+            metrics=[dice_metric, dice_et, dice_tc, dice_wt,
+                     hd_metric, hd_et, hd_tc, hd_wt],
 
-    # Load from checkpoint
-    checkpoint_path = join(hlp.LOG_DIR, 'snapshots', model_name, f'final_{model_name}_v{version}.ckpt')
-    model = model.load_from_checkpoint(checkpoint_path=checkpoint_path)
-    model = model.to(device)
+            # Optimizer
+            optimizer=optim.AdamW,
+            optimizer_params={'lr': 1e-4, 'weight_decay': 1e-5},
 
-    # Predict a sample
-    brats = BraTSDataModule(data_dir=join(hlp.DATA_DIR, "MICCAI_BraTS2020_TrainingData"), num_workers=2)
-    brats.setup('test')
+            # Learning rate scheduler
+            scheduler=CosineAnnealingWarmRestarts,
+            scheduler_config={'interval': 'epoch'},
+            scheduler_params={'T_0': 50, 'eta_min': 3e-5},
 
-    # Predict all samples
-    for sample in tqdm(brats.test_set, f"Predicting samples using {model_name} model"):
+            # Inference method
+            inference=val_inference,
+            inference_params=None,
+
+            # Test inference method
+            test_inference=test_inference,
+            test_inference_params={'overlap': .5},
+        )
+
+        # Load from checkpoint
+        checkpoint_path = join(hlp.LOG_DIR, 'snapshots',model_name, f'final_{model_name}_v{version}_fold{fold_index}.ckpt')
+
+        model = model.load_from_checkpoint(checkpoint_path=checkpoint_path)
+        model = model.to(device)
+
+        # Predict a sample
+        brats = BraTSDataModule(data_dir=join(hlp.DATA_DIR, "MICCAI_BraTS2020_TrainingData"), num_workers=2)
+        brats.setup('test')
+
+        # Predict all samples
+        '''for index, sample in tqdm(enumerate(brats.test_set), f"Predicting samples using {model_name} model"):
+            print(index, sample['id'])
+            if sample['id'] != 'BraTS20_Training_102':
+                print('skip')
+                continue'''
+
+        sample = brats.test_set[16]
 
         with torch.no_grad():
             test = predict(model=model, sample=sample, model_name=model_name, device=device, write_dir=write_dir).detach()
-
         test = sitk.GetImageFromArray(test.cpu().numpy())
-        sitk.WriteImage(image=test, fileName=join(write_dir, f'pred_{sample["id"]}.nii.gz'))
+        sitk.WriteImage(image=test, fileName=join(write_dir, f'{model_name}_v{version}_2.nii.gz'))

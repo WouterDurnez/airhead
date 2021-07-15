@@ -18,7 +18,9 @@ from pytorch_lightning.callbacks import Callback
 from sympy import Symbol
 from sympy.solvers import solve
 from torch.optim.lr_scheduler import LambdaLR
-
+from helper import KUL_PAL
+import helper as hlp
+from os.path import join
 from helper import log
 
 
@@ -289,6 +291,9 @@ def get_network_size(tuning_param: float, tensor_net_type: str, in_channels: int
 
 if __name__ == '__main__':
 
+    hlp.hi('Utils')
+    vis_dir = join(hlp.DATA_DIR, 'visuals')
+
     in_channels = 64
     out_channels = 32
     kernel_size = 3
@@ -342,24 +347,32 @@ if __name__ == '__main__':
     df = pd.DataFrame({
         'Compression': compression_rates,
         'Theoretical': theoretical_params,
-        'CPD': cpd_params,
+        'Canonical polyadic': cpd_params,
+        'Tensor train (version 1)': tt_params,
+        'Tensor train (version 2)': tt2_params,
         'Tucker': tucker_params,
-        'Tensor train': tt_params,
-        'Tensor train 2': tt2_params
-    })
-    df = df.melt(id_vars='Compression', var_name='Tensor network',
-                 value_vars=['Theoretical', 'CPD', 'Tucker', 'Tensor train', 'Tensor train 2'], value_name='parameters')
-    df.parameters = df.parameters.astype('int')
 
+    })
+    df = df.melt(id_vars='Compression', var_name='Format',
+                 value_vars=['Theoretical', 'Canonical polyadic', 'Tucker', 'Tensor train (version 1)', 'Tensor train (version 2)'], value_name='parameters')
+    df.parameters = df.parameters.astype('int')
+    df['actual_compression'] = max_param/df.parameters
+    df = df.loc[df['Format']!='Theoretical']
     # Plot
-    sns.set_theme(context='talk', style='white', palette='deep')
-    sns.lineplot(data=df, x='Compression', y='parameters', hue='Tensor network', style='Tensor network',
-                 markers=True,dashes=True)
-    plt.ylabel('# Parameters')
-    #plt.xscale('log')
+    colors = sns.color_palette(KUL_PAL) # + ["#DD8A2E"])[1:]
+    fig, ax = plt.subplots(1,1,figsize=(6,6), dpi=300)
+    sns.set_theme(context='paper',font_scale=1.3, style='white', palette=colors)
+    sns.lineplot(data=df, x='Compression', y='actual_compression', hue='Format', style='Format',
+                 markers=True,markersize=8,dashes=True,palette=colors,ax=ax)
+    ax.set_ylabel('Actual compression rate',fontweight='bold',size=15)
+    ax.set_xlabel('Chosen compression rate',fontweight='bold',size=15)
+    plt.setp(ax.get_legend().get_title(), fontweight='bold')
+    #ax.set_xscale('log')
+    #ax.set_yscale('log')
     #plt.yscale('log')
     #plt.ylim(400,1000)
     #plt.xlim(70,100)
     sns.despine(left=True, bottom=True)
     plt.tight_layout()
+    plt.savefig(join(vis_dir, 'param_vs_compression.pdf'),bbox_inches='tight', pad_inches=0)
     plt.show()

@@ -18,6 +18,8 @@ TIMESTAMPED = True
 DATA_DIR = join(Path(os.path.dirname(os.path.abspath(__file__))).parents[1], 'data')
 LOG_DIR = join(Path(os.path.dirname(os.path.abspath(__file__))).parents[1], 'logs')
 TENSOR_NET_TYPES = ['cp', 'cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt', 'train2', 'tensor-train2', 'tt2']
+KUL_PAL = ['#FF7251', '#C58B85', '#8CA5B8', '#52BEEC']
+
 
 # Set parameters
 def set_params(verbosity: int = None, timestamped: bool = None, data_dir: str = None, log_dir: str = None):

@@ -342,7 +342,7 @@ class AirConv3D(nn.Module):
             log(f'Creating Tensor Train network [compression rate = {self.compression}].', verbosity=3, color='magenta')
 
             """
-            The TT2 format carbon copies the TT format, with one different: the middle two bond dimensions are set to 3.
+            The TT2 format carbon copies the TT format, with one difference: the middle two bond dimensions are set to 3.
             """
 
             # We tune the bond dimensions (assumed equal across the 'train')
@@ -703,7 +703,7 @@ if __name__ == '__main__':
     layer_classic.to(device)
 
     # Low-rank layers
-    compression = 5
+    compression = 100
 
     # Canonical layer
     layer_canon = AirConv3D(in_channels=in_channels, out_channels=out_channels,
@@ -742,6 +742,7 @@ if __name__ == '__main__':
 
     assert double_conv_cpd_output.size() == double_conv_classic_output.size(), "Something went wrong with double conv CPD, output shapes don't match!"
     """
+
     # Attempt to get flop count --> failed for tensor network versions!
     for name, model in zip(('regular', 'cpd', 'tucker', 'tt'), (layer_classic, layer_canon, layer_tucker, layer_tt)):
         macs, params = get_model_complexity_info(model=model, input_res=(4, 128, 128, 128), as_strings=True,

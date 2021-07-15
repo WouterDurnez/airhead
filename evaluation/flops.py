@@ -75,4 +75,4 @@ if __name__ == '__main__':
             }
 
     # Store all info
-    np.save(join(result_dir, 'model_flops.npy'), info)
+    np.save('model_flops.npy', info)

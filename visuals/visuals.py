@@ -7,6 +7,7 @@
 """
 Visualization functions
 """
+from itertools import product
 from os.path import join
 
 import SimpleITK as sitk
@@ -25,70 +26,19 @@ from utils.helper import set_dir, log
 #colors = ('red','green','yellow')
 colors = [ "#FF7251", "#52BEEC", "#FFCE51",]
 
-def show_subject(sample: dict, axis: int = 0, slice: int = 100):
-    # Do we have predictions?
-    p = 'prediction' in sample
-
-    img = np.array(sample['input']).take(indices=slice, axis=axis + 1)
-    msk = np.array(sample['target'][0]).take(indices=slice, axis=axis)
-    if p:
-        pre = np.array(sample['prediction']).take(indices=slice, axis=axis)
-
-    # Viz parameters
-    channels = ['T1', 'T1 post-contrast', 'T2', 'FLAIR']
-    alpha = .65
-
-    # Set some aesthetic parameters
-    sns.set_theme(font_scale=1.3, font='utopia')
-
-    # Make plot
-    rows = 3 if p else 2
-    fig, ax = plt.subplots(rows, 4, dpi=300, figsize=(12, 12))
-
-    # Define color map
-    cmap_mask = ListedColormap(['none', colors[0], colors[1], colors[2]])
-
-    # Add labels
-    ax[0, 0].set_ylabel('Image', fontdict={'weight':'bold'})
-    ax[1, 0].set_ylabel('Target', fontdict={'weight':'bold'})
-    if p:
-        ax[2, 0].set_ylabel('Prediction', fontdict={'weight':'bold'})
-
-    # Plot all images and masks
-    for index, channel in enumerate(channels):
-        # Top row without masks
-        ax[0, index].imshow(img[index, ...], cmap='gray')
-        ax[0, index].set_title(channel, fontweight='bold')
-        # Second row with target masks
-        ax[1, index].imshow(img[index, ...], cmap='gray')
-        ax[1, index].imshow(msk, alpha=alpha, cmap=cmap_mask)
-        # Bottom row with predicted masks
-        if p:
-            ax[2, index].imshow(img[index, ...], cmap='gray')
-            ax[2, index].imshow(pre, alpha=alpha, cmap=cmap_mask)
-
-    plt.setp(ax, xticks=[], xticklabels=[], yticks=[], yticklabels=[])
-    plt.suptitle(f'BraTS dataset - subject {sample["id"]}', fontweight='bold')
-
-    #plt.legend(handles=[mpatches.Patch(color=col, label=lab) for col, lab in
-    #                    zip((colors[0], colors[2], colors[1]), ('ET', 'TC', 'WT'))])
-
-    plt.tight_layout()
-
-    plt.savefig('baseline_pred.pdf')
-    plt.show()
-
-
 if __name__ == '__main__':
     # Let's go
     hlp.hi("Visualizing BraTS")
 
-    model_name = 'unet_baseline'
-    version = 6
+    # Define all model combinations
+    models = [('baseline',0)]
+    types = ('cpd','tt','tt2','tucker')
+    compressions = (2,5,10,20,50,100)
+    models += list(product(types,compressions))
 
     # Set data directory
-    vis_dir = join(hlp.LOG_DIR, 'images', model_name)
     pred_dir = join(hlp.DATA_DIR, 'predictions')
+    vis_dir = join(hlp.DATA_DIR, 'visuals')
     set_dir(vis_dir)
 
     # Initialize data module
@@ -99,37 +49,163 @@ if __name__ == '__main__':
     brats.setup()
 
     # Get an image
-    idx = 15      # Sample id: 'BraTS20_Training_102'
+    idx = 16      # Sample id: 'BraTS20_Training_102'
     sample = brats.visualization_set[idx]
 
-    # Get prediction
-    file_name = f'pred_{sample["id"]}.nii.gz'
-    prediction = sitk.ReadImage(join(pred_dir, model_name, f'v{version}', file_name))
-    prediction = sitk.GetArrayFromImage(prediction)
-    prediction_new = np.zeros(shape=prediction.shape[1:])
+    # Make sure we'll store the types
+    for t in types:
+        sample[t] = {}
 
-    '''
-    Remember we used this scheme:
-    class 1: ET (label 4) -- enhancing tumor
-    class 2: TC (label 4 + 1) -- tumor core = enhancing + non-enhancing + necrotic
-    class 3: WT: (label 4 + 1 + 2) -- whole tumor = tumor core + edema
-    '''
+    # Get predictions
+    for type, comp in models:
+        file_name = f'unet_{type}_f0_v{comp}_2.nii.gz'
+        prediction = sitk.ReadImage(join(pred_dir, file_name))
+        prediction = sitk.GetArrayFromImage(prediction)
+        prediction_new = np.zeros(shape=prediction.shape[1:])
 
-    # Nested, so first fill in WT, then TC, then ET
-    prediction_new[prediction[2] == 1] = 2
-    prediction_new[prediction[1] == 1] = 1
-    prediction_new[prediction[0] == 1] = 4
+        '''
+        Remember we used this scheme:
+        class 1: ET (label 4) -- enhancing tumor
+        class 2: TC (label 4 + 1) -- tumor core = enhancing + non-enhancing + necrotic
+        class 3: WT: (label 4 + 1 + 2) -- whole tumor = tumor core + edema
+        '''
 
-    # Crop foreground (as we did in visual transforms)
-    start = sample['foreground_start_coord']
-    end = sample['foreground_end_coord']
-    prediction_new = prediction_new[
-                     start[0]:end[0],
-                     start[1]:end[1],
-                     start[2]:end[2]]
+        # Nested, so first fill in WT, then TC, then ET
+        prediction_new[prediction[2] == 1] = 2
+        prediction_new[prediction[1] == 1] = 1
+        prediction_new[prediction[0] == 1] = 4
 
-    # Add cleaned up prediction to sample dict
-    sample['prediction'] = torch.tensor(prediction_new)
+        # Crop foreground (as we did in visual transforms)
+        start = sample['foreground_start_coord']
+        end = sample['foreground_end_coord']
+        prediction_new = prediction_new[
+                         start[0]:end[0],
+                         start[1]:end[1],
+                         start[2]:end[2]]
 
-    # Plot
-    show_subject(sample=sample, slice=100)
+        # Add cleaned up prediction to sample dict
+        if type=='baseline':
+            sample['baseline'] = torch.tensor(prediction_new)
+        else:
+            sample[type][comp] = torch.tensor(prediction_new)
+
+    # Plot #
+    ########
+
+    # Viz parameters
+    channels = ['T1', 'T1 post-contrast', 'T2', 'FLAIR']
+    alpha = 1
+    axis = 0
+    slice = 85
+
+    # Prep raw input and target
+    img = np.array(sample['input']).take(indices=slice, axis=axis + 1)
+    tgt = np.array(sample['target'][0]).take(indices=slice, axis=axis)
+
+    '''tgt[tgt == 1.] = 0
+    tgt[tgt == 2.] = 0
+    tgt[tgt == 1.] = 0'''
+
+    # Prep model predictions
+    predictions = {
+        type: {} for type in types
+    }
+    predictions['baseline'] = np.array(sample['baseline']).take(indices=slice, axis=axis)
+    for type, comp in models:
+        predictions[type][comp] = np.array(sample[type][comp]).take(indices=slice, axis=axis)
+
+    # Set some aesthetic parameters
+    sns.set_theme(font_scale=1, font='Utopia')
+
+    # Make plot 1 #
+    ##############
+
+    fig, ax = plt.subplots(5, 6, dpi=300, figsize=(12, 12))
+
+    # Define color map
+    cmap_mask = ListedColormap(['none', colors[0], colors[1], colors[2]])
+
+    # Add labels
+    ax[0, 0].set_ylabel('Images', fontdict={'weight': 'bold'})
+    ax[1, 0].set_ylabel('Target', fontdict={'weight': 'bold'})
+    #ax[2, 0].set_ylabel('Prediction', fontdict={'weight': 'bold'})
+
+    # Plot all images and masks
+    for index, channel in enumerate(channels):
+        # Top row, first 4 columns, without masks
+        ax[0, index].imshow(img[index, ...], cmap='gray')
+        ax[0, index].set_title(channel, fontweight='bold')
+
+    # Top row, column 5, ground truth
+    ax[0, 4].imshow(img[0, ...], alpha=.5, cmap='gray')
+    ax[0, 4].imshow(tgt, alpha=alpha, cmap=cmap_mask)
+    ax[0, 4].set_ylabel('Target', fontweight='bold')
+
+    # Top row, column 6, baseline prediction
+    ax[0, 5].imshow(img[0, ...], alpha=.5, cmap='gray')
+    ax[0, 5].imshow(predictions['baseline'], alpha=alpha, cmap=cmap_mask)
+    ax[0, 5].set_ylabel('Baseline', fontweight='bold')
+
+    # Show tensor model predictions for all compression rates
+    for row_index, type in enumerate(types, 1):
+        for col_index, comp in enumerate(compressions):
+            pretty_type = {
+                'tt': 'Tensor train',
+                'tt2': 'Tensor train 2',
+                'cpd': 'Canonical polyadic',
+                'tucker': 'Tucker'
+            }
+
+            ax[row_index, 0].set_ylabel(pretty_type[type], fontdict={'weight': 'bold'})
+            ax[row_index, col_index].imshow(img[0, ...], alpha=.5, cmap='gray')
+            ax[row_index, col_index].imshow(predictions[type][comp], alpha=alpha, cmap=cmap_mask)
+
+            if row_index == 4:
+                ax[row_index,col_index].set_xlabel(comp, fontdict={'weight': 'bold'})
+
+    plt.subplots_adjust(hspace=0)
+    plt.setp(ax, xticks=[], xticklabels=[], yticks=[], yticklabels=[])
+    #plt.suptitle('test', fontweight='bold')
+
+    # plt.legend(handles=[mpatches.Patch(color=col, label=lab) for col, lab in
+    #                    zip((colors[0], colors[2], colors[1]), ('ET', 'TC', 'WT'))])
+
+    #plt.tight_layout()
+
+    plt.savefig(join(vis_dir, 'prediction_overview.pdf'),bbox_inches='tight', pad_inches=0)
+    plt.show()
+
+    # Make plot 2 #
+    ##############
+
+    fig, ax = plt.subplots(1, 5, dpi=300, figsize=(16, 4))
+    sns.set_theme(context='paper',font_scale=2, font='Utopia')
+
+    # Define color map
+
+    # Add labels
+    ax[0].set_ylabel('Images', fontdict={'weight': 'bold'})
+
+    # Plot all images and masks
+    for index, channel in enumerate(channels):
+        # Top row, first 4 columns, without masks
+        ax[index].imshow(img[index, ...], cmap='gray')
+        ax[index].set_title(channel, fontweight='bold')
+
+    # Top row, column 5, ground truth
+    ax[4].imshow(img[0, ...], alpha=.5, cmap='gray')
+    ax[4].imshow(tgt, alpha=alpha, cmap=cmap_mask)
+    ax[4].set_ylabel('Target', fontweight='bold')
+
+    plt.subplots_adjust(hspace=0)
+    plt.setp(ax, xticks=[], xticklabels=[], yticks=[], yticklabels=[])
+    #plt.suptitle('test', fontweight='bold')
+
+    plt.legend(handles=[mpatches.Patch(color=col, label=lab) for col, lab in
+                        zip((colors[0], colors[2], colors[1]), ('ET', 'TC', 'WT'))],
+               bbox_to_anchor=(1.05, 1), loc='upper left',)
+
+    plt.tight_layout()
+
+    plt.savefig(join(vis_dir, 'dataset_overview.pdf'),bbox_inches='tight', pad_inches=0)
+    plt.show()
