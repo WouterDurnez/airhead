@@ -14,7 +14,7 @@ import torch
 import torch.nn as nn
 from torch import cat
 from utils.helper import *
-
+import numpy as np
 
 # Downsample block
 class DownsampleMax(nn.Module):
