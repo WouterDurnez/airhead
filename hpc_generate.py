@@ -29,16 +29,19 @@ if __name__ == '__main__':
                 for type in ('cpd','tucker','tt','tt2'):
                     command = f'qsub jobscript_air.pbs -v TYPE={type},FOLD={fold},COMP={comp}\n'
                     f.write(command)'''
-    fold = 0
-    with open(f'jobscripts_batch_test_fold{fold}.sh', 'w') as f:
+
+    with open(f'jobscripts_tucker2.sh', 'w') as f:
+
         f.write('#!/bin/bash\n')
 
-        f.write(f'\n#FOLD {fold}\n')
+        for fold in range(5):
 
-        for comp in (2, 5, 10, 20, 50, 100):
+            f.write(f'\n#FOLD {fold}\n')
 
-            f.write(f'#COMPRESSION {comp}\n')
+            for comp in (2,5,10,20,35,50,75,100):
 
-            for type in ('cpd', 'tucker', 'tt', 'tt2'):
-                command = f'qsub jobscript_test_air.pbs -v TYPE={type},FOLD={fold},COMP={comp}\n'
-                f.write(command)
+                f.write(f'#COMPRESSION {comp}\n')
+
+                for type in ('tucker2',):
+                    command = f'qsub jobscript_air.pbs -v TYPE={type},FOLD={fold},COMP={comp}\n'
+                    f.write(command)
