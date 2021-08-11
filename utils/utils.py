@@ -12,6 +12,7 @@ import math
 import os
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 from pytorch_lightning.callbacks import Callback
@@ -128,7 +129,7 @@ def get_tuning_var(compression: int, tensor_net_type: str, in_channels: int, out
     """
 
     # Make sure the right type of tensor network was passed
-    types = ['cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt', 'train2', 'tensor-train2', 'tt2', 'peps']
+    types = ['cpd', 'canonical', 'tucker', 'tucker2', 'train', 'tensor-train', 'tt', 'train2', 'tensor-train2', 'tt2', 'peps']
     assert tensor_net_type in types, f"Choose a valid tensor network {types}"
 
     # Number of parameters for a full-rank convolution
@@ -171,6 +172,38 @@ def get_tuning_var(compression: int, tensor_net_type: str, in_channels: int, out
         evaluated_solutions = []
         for s in solutions:
             evaluated_solutions.append(s.evalf())
+
+        # Check if unique positive, real solution
+        assert len(evaluated_solutions) == 1, 'Too many solutions!'
+
+        return evaluated_solutions[0]
+
+    ##########
+    # TUCKER2 #
+    ##########
+
+    elif tensor_net_type in ['tucker2']:
+
+        '''
+        tucker params:
+        ((C_in/S) * 3 * 3 * 3 * (C_out/S)) + (input_channels**2/S) + (output_channels**2/S)
+        = core tensor shape                + input node shape      + output node shape 
+
+        compression = max_params / tucker_params        
+        '''
+
+        S = Symbol('S', real=True)
+        solutions = solve((max_params / (
+                (3 ** 3 * (in_channels / S) * (out_channels / S)) + (
+                (in_channels ** 2) / S) + (
+                        (out_channels ** 2) / S))) - compression, S)
+
+        # Check for appropriate S values
+        evaluated_solutions = []
+        for s in solutions:
+            evaluated = s.evalf()
+            if evaluated > 0:
+                evaluated_solutions.append(evaluated)
 
         # Check if unique positive, real solution
         assert len(evaluated_solutions) == 1, 'Too many solutions!'
@@ -231,7 +264,7 @@ def get_tuning_var(compression: int, tensor_net_type: str, in_channels: int, out
 def get_network_size(tuning_param: float, tensor_net_type: str, in_channels: int, out_channels: int,
                      kernel_size: int = 3) -> float:
     # Make sure the right type of tensor network was passed
-    types = ['cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt','train2', 'tensor-train2', 'tt2', 'peps']
+    types = ['cpd', 'canonical', 'tucker', 'tucker2','train', 'tensor-train', 'tt','train2', 'tensor-train2', 'tt2', 'peps']
     assert tensor_net_type in types, f"Choose a valid tensor network {types}"
 
     #######
@@ -263,6 +296,23 @@ def get_network_size(tuning_param: float, tensor_net_type: str, in_channels: int
         out_param = round(out_channels / tuning_param)
         return (in_param * 3 * 3 * 3 * out_param) + \
                3 ** 3 + \
+               (in_channels * in_param) + \
+               (out_channels * out_param)
+
+    ############
+    # TUCKER 2 #
+    ############
+
+    if tensor_net_type in ['tucker2']:
+        '''
+        tucker params:
+        ((C_in/S) * 3 * 3 * 3 * (C_out/S)) + (input_channels**2/S) + (output_channels**2/S)
+        = core tensor shape                + input node shape      + output node shape 
+
+        '''
+        in_param = round(in_channels / tuning_param)
+        out_param = round(out_channels / tuning_param)
+        return (in_param * kernel_size ** 3 * out_param) + \
                (in_channels * in_param) + \
                (out_channels * out_param)
 
@@ -316,8 +366,8 @@ if __name__ == '__main__':
                                          out_channels=out_channels, kernel_size=3)
             print(f'comp {comp} - in {in_channels} - out {out_channels} --> R={tune_train}')'''
 
-    tuning_cpd, tuning_tt, tuning_tucker, tuning_tt2 = [], [], [], []
-    cpd_params, tt_params, tucker_params, tt2_params = [], [], [], []
+    tuning_cpd, tuning_tt, tuning_tucker, tuning_tucker2, tuning_tt2 = [], [], [], [], []
+    cpd_params, tt_params, tucker_params, tucker2_params, tt2_params = [], [], [], [], []
     theoretical_params = []
     compression_rates = range(5, 100, 5)
     # compression_rates = (1,5,10,50,100)
@@ -333,7 +383,11 @@ if __name__ == '__main__':
         tucker_params.append(
             get_network_size(tuning_param=tuning_tucker[-1], tensor_net_type='tucker', in_channels=in_channels,
                              out_channels=out_channels, kernel_size=3))
-
+        tuning_tucker2.append(get_tuning_var(compression=comp, tensor_net_type='tucker2', in_channels=in_channels,
+                                            out_channels=out_channels, kernel_size=3))
+        tucker2_params.append(
+            get_network_size(tuning_param=tuning_tucker[-1], tensor_net_type='tucker2', in_channels=in_channels,
+                             out_channels=out_channels, kernel_size=3))
         tuning_tt.append(get_tuning_var(compression=comp, tensor_net_type='tt', in_channels=in_channels,
                                         out_channels=out_channels, kernel_size=3))
         tt_params.append(get_network_size(tuning_param=tuning_tt[-1], tensor_net_type='tt', in_channels=in_channels,
@@ -348,15 +402,16 @@ if __name__ == '__main__':
         'Compression': compression_rates,
         'Theoretical': theoretical_params,
         'Canonical polyadic': cpd_params,
-        'Tensor train (version 1)': tt_params,
-        'Tensor train (version 2)': tt2_params,
-        'Tucker': tucker_params,
+        'Tensor train (v1)': tt_params,
+        'Tensor train (v2)': tt2_params,
+        'Tucker': tucker2_params,
 
     })
     df = df.melt(id_vars='Compression', var_name='Format',
-                 value_vars=['Theoretical', 'Canonical polyadic', 'Tucker', 'Tensor train (version 1)', 'Tensor train (version 2)'], value_name='parameters')
+                 value_vars=['Theoretical', 'Canonical polyadic', 'Tensor train (v1)', 'Tensor train (v2)', 'Tucker'], value_name='parameters')
     df.parameters = df.parameters.astype('int')
     df['actual_compression'] = max_param/df.parameters
+    df['compression_error'] = np.absolute(df.actual_compression - df.Compression)/df.Compression
     df = df.loc[df['Format']!='Theoretical']
     # Plot
     colors = sns.color_palette(KUL_PAL) # + ["#DD8A2E"])[1:]
