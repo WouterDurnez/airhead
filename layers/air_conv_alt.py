@@ -106,7 +106,7 @@ class AirConv3DAlt(nn.Module):
         self.bias = bias
         self.tensor_net_type = tensor_net_type
 
-        assert self.tensor_net_type in TENSOR_NET_TYPES, f"Choose a valid tensor network {types}"
+        assert self.tensor_net_type in TENSOR_NET_TYPES, f"Choose a valid tensor network [{TENSOR_NET_TYPES}]"
 
         self.__name__ = f'{self.tensor_net_type.lower()}_low_rank_conv'
 
@@ -258,6 +258,55 @@ class AirConv3DAlt(nn.Module):
                     "shape": (self.kernel_size, rank),
                     "legs": [kernel_dim, rank_leg]
                 }
+
+            # Finally, add factor matrices for input and output channels
+            nodes['U_c_in'] = {
+                "tensor": Tensor(self.in_channels, self.r1),
+                "shape": (self.in_channels, self.r1),
+                "legs": ['-c_in', 'r1']
+            }
+            nodes['U_c_out'] = {
+                "tensor": Tensor(self.r5, self.out_channels),
+                "shape": (self.r5, self.out_channels),
+                "legs": ['r5', '-c_out']  # <-- output channels becomes dangling edge after contraction
+            }
+        ###################
+        # TUCKER 2 FORMAT #
+        ###################
+
+        elif self.tensor_net_type in ['tucker2']:
+
+            log(f'Creating Tucker (version 2) tensor network [compression rate = {self.compression}].', verbosity=3,
+                color='magenta')
+
+            """
+            For the CPD format, we need 6 nodes: 5 factor matrices and a core tensor: 
+             * 1 factor matrix for each of the kernel dimensions: U_k_h, U_k_w, U_kd,
+             * 1 factor matrix for the input channels, 1 for the output channels: U_c_in and U_c_out
+             * 1 core tensor: G
+
+
+
+             c_in - O - O - O - c_out
+                     (middle node = core tensor G)
+            """
+
+            # We set shape of G (core tensor) to (r1, r2, r3, r4, r5) = (in_channels/S, 3, 3, 3, out_channels/s)
+            self.r2 = self.r3 = self.r4 = 3
+
+            # Get tuning parameter S
+            self.S = self._get_tuning_par()
+
+            # Get r1 and r5
+            self.r1 = round(self.in_channels / self.S) if round(self.in_channels / self.S) > 0 else 1
+            self.r5 = round(self.out_channels / self.S) if round(self.out_channels / self.S) > 0 else 1
+
+            # Let's start with the core tensor
+            nodes['G'] = {
+                'tensor': Tensor(self.r1, self.r2, self.r3, self.r4, self.r5),
+                'shape': (self.r1, self.r2, self.r3, self.r4, self.r5),
+                'legs': ['r1', '-k_h', '-k_w', '-k_d', 'r5']
+            }
 
             # Finally, add factor matrices for input and output channels
             nodes['U_c_in'] = {
@@ -438,6 +487,38 @@ class AirConv3DAlt(nn.Module):
 
             return evaluated_solutions[0]
 
+        ##########
+        # TUCKER2 #
+        ##########
+
+        elif self.tensor_net_type in ['tucker2']:
+
+            '''
+            tucker params:
+            ((C_in/S) * 3 * 3 * 3 * (C_out/S)) + (input_channels**2/S) + (output_channels**2/S)
+            = core tensor shape                + input node shape      + output node shape 
+
+            compression = max_params / tucker_params        
+            '''
+
+            S = Symbol('S', real=True)
+            solutions = solve((max_params / (
+                    (3 ** 3 * (self.in_channels / S) * (self.out_channels / S)) + (
+                    (self.in_channels ** 2) / S) + (
+                            (self.out_channels ** 2) / S))) - self.compression, S)
+
+            # Check for appropriate S values
+            evaluated_solutions = []
+            for s in solutions:
+                evaluated = s.evalf()
+                if evaluated > 0:
+                    evaluated_solutions.append(evaluated)
+
+            # Check if unique positive, real solution
+            assert len(evaluated_solutions) == 1, 'Too many solutions!'
+
+            return evaluated_solutions[0]
+
         ################
         # TENSOR TRAIN #
         ################
@@ -525,6 +606,23 @@ class AirConv3DAlt(nn.Module):
             out_param = round(self.out_channels / self.S)
             return (in_param * self.kernel_size ** 3 * out_param) + \
                    3 * self.kernel_size ** 2 + \
+                   (self.in_channels * in_param) + \
+                   (self.out_channels * out_param)
+
+        ############
+        # TUCKER 2 #
+        ############
+
+        if self.tensor_net_type in ['tucker2']:
+            '''
+            tucker params:
+            ((C_in/S) * 3 * 3 * 3 * (C_out/S)) + (input_channels**2/S) + (output_channels**2/S)
+            = core tensor shape                + input node shape      + output node shape 
+
+            '''
+            in_param = round(self.in_channels / self.S)
+            out_param = round(self.out_channels / self.S)
+            return (in_param * self.kernel_size ** 3 * out_param) + \
                    (self.in_channels * in_param) + \
                    (self.out_channels * out_param)
 
@@ -669,7 +767,7 @@ if __name__ == '__main__':
     # Tucker layer
     layer_tucker = AirConv3DAlt(in_channels=in_channels, out_channels=out_channels,
                                  compression=compression,
-                                 kernel_size=kernel_dim, padding=1, tensor_net_type='tucker')
+                                 kernel_size=kernel_dim, padding=1, tensor_net_type='tucker2')
     layer_tucker.to(device)
 
     # TT layer
