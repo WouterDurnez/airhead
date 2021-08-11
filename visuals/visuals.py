@@ -150,8 +150,8 @@ if __name__ == '__main__':
     for row_index, type in enumerate(types, 1):
         for col_index, comp in enumerate(compressions):
             pretty_type = {
-                'tt': 'Tensor train',
-                'tt2': 'Tensor train 2',
+                'tt': 'Tensor train (v1)',
+                'tt2': 'Tensor train (v2)',
                 'cpd': 'Canonical polyadic',
                 'tucker': 'Tucker'
             }
