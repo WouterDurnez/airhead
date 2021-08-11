@@ -14,6 +14,7 @@ import utils.helper as hlp
 from os.path import join
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 import matplotlib as mpl
+import math
 
 hlp.hi('Analysis', log_dir='../../logs_cv')
 vis_dir = join(hlp.DATA_DIR, 'visuals')
@@ -176,3 +177,59 @@ if __name__ == '__main__':
     plt.savefig(join(vis_dir, 'imagenet_comp.pdf'), bbox_inches='tight', pad_inches=0)
     plt.show()
     #plt.savefig('imagenet-history.svg')
+
+    ###########################
+    # Vanishing gradient plot #
+    ###########################
+
+    def sigmoid(x):
+        a = []
+        for item in x:
+            a.append(1 / (1 + math.exp(-item)))
+        return a
+
+    x = np.arange(-10., 10., 0.2)
+    sig = sigmoid(x)
+    dsig = [sig_val*(1-sig_val) for sig_val in sig]
+
+    size = 14
+
+    mpl.rcParams.update(mpl.rcParamsDefault)
+    sns.set_theme(context='paper',style='white', font_scale=1)
+
+    fig, ax = plt.subplots(1, 1, figsize=(6,4), dpi=300)
+    ax.plot(x, sig, color='#DD8A2E', linewidth=2, label='Sigmoid')
+    ax.plot(x, dsig, color='#DD8A2E', linestyle='--', linewidth=2, label='Sigmoid derivative')
+    ax.axhline(y=0, color='k')
+    ax.axvline(x=0, color='k')
+    #ax.set_xlabel('Input', fontdict={'size': size, 'weight': 'bold'})
+    #ax.set_ylabel('Activation', fontdict={'size': size, 'weight': 'bold'})
+    sns.despine(left=True, bottom=True)
+    plt.legend()
+    #plt.gca().set_aspect('equal', adjustable='box')
+    plt.tight_layout()
+    plt.savefig(join(vis_dir, 'sigmoid.pdf'), bbox_inches='tight', pad_inches=0)
+    plt.show()
+
+    #####################
+    # Contraction order #
+    #####################
+    import numpy as np
+    import opt_einsum as oe
+
+    dim = 10
+    Z = np.random.rand(dim, dim, dim, dim)
+    Y = np.random.rand(dim, dim)
+    X = np.random.rand(dim, dim)
+
+    path2 = oe.contract_path('ij,jk,klmn->ilmn',X,Y,Z)
+
+    path1a = oe.contract_path('ij,jklm->iklm', Y, Z)
+    T = oe.contract('ij,jklm->iklm', Y, Z)
+
+    path1b = oe.contract_path('ij,jklm->iklm', X,T)
+
+    cost_opt = path2[1].opt_cost
+    cost_bad = path1a[1].opt_cost + path1b[1].opt_cost
+
+
