@@ -22,15 +22,15 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from torch import optim
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
-from layers.air_conv_alt import AirDoubleConvAlt
+from layers.air_conv import AirDoubleConv
 from models.air_unet import AirUNet
 from training.data_module import BraTSDataModule
 from training.inference import val_inference, test_inference
 from training.lightning import UNetLightning
 from training.losses import dice_loss, dice_metric, dice_et, dice_tc, dice_wt, hd_metric, hd_et, hd_tc, hd_wt
 from utils import helper as hlp
-from utils.helper import log
-from utils.helper import set_dir
+from utils.helper import log, set_dir
+from utils.utils import WarmupCosineSchedule
 
 pp = PrettyPrinter()
 
@@ -74,7 +74,8 @@ if __name__ == '__main__':
         network_params={
             'compression': compression,
             'tensor_net_type': tensor_net_type,
-            'double_conv': AirDoubleConvAlt,
+            'double_conv': AirDoubleConv,
+            'double_conv_params': {'comp_friendly':True},
             'in_channels': 4,
             'out_channels': 3,
             'widths': (32, 64, 128, 256, 320),
@@ -87,12 +88,12 @@ if __name__ == '__main__':
 
         # Optimizer
         optimizer=optim.AdamW,
-        optimizer_params={'lr': 1e-4, 'weight_decay': 1e-5},
+        optimizer_params={'lr': 1e-4, 'weight_decay': 1e-2},
 
         # Learning rate scheduler
-        scheduler=CosineAnnealingWarmRestarts,
-        scheduler_config={'interval': 'epoch'},
-        scheduler_params={'T_0': 50, 'eta_min':3e-5},
+        scheduler=WarmupCosineSchedule,
+        scheduler_config={'interval': 'step'},
+        scheduler_params={"warmup_steps": 0, "total_steps": 100000},
 
         # Inference method
         inference=val_inference,

@@ -11,7 +11,6 @@ import torch.nn as nn
 from torch import cat
 
 from layers.air_conv import AirDoubleConv
-from layers.air_conv_alt import AirDoubleConvAlt
 from models.baseline_unet import Upsample
 from utils.helper import log, set_params, count_params
 import torch
@@ -28,7 +27,7 @@ class AirUNet(nn.Module):
             out_channels,
             widths=(32, 64, 128, 256, 320),
             activation=nn.LeakyReLU(inplace=True),
-            double_conv=AirDoubleConvAlt,
+            double_conv=AirDoubleConv,
             double_conv_params=None,
             downsample='strided_convolution',
             up_par=None,

@@ -28,6 +28,7 @@ from training.losses import dice_loss, dice_metric, dice_et, dice_tc, dice_wt, h
 from utils import helper as hlp
 from utils.helper import log
 from utils.helper import set_dir
+from utils.utils import WarmupCosineSchedule
 
 pp = PrettyPrinter()
 
@@ -73,12 +74,12 @@ if __name__ == '__main__':
 
         # Optimizer
         optimizer=optim.AdamW,
-        optimizer_params={'lr': 1e-4, 'weight_decay': 1e-5},
+        optimizer_params={'lr': 1e-4, 'weight_decay': 1e-2},
 
         # Learning rate scheduler
-        scheduler=CosineAnnealingWarmRestarts,
-        scheduler_config={'interval': 'epoch'},
-        scheduler_params={'T_0': 50, 'eta_min':3e-5},
+        scheduler=WarmupCosineSchedule,
+        scheduler_config={'interval': 'step'},
+        scheduler_params={"warmup_steps": 0, "total_steps": 100000},
 
         # Inference method
         inference=val_inference,
