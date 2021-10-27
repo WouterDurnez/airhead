@@ -17,7 +17,7 @@ VERBOSITY = 3
 TIMESTAMPED = True
 DATA_DIR = join(Path(os.path.dirname(os.path.abspath(__file__))).parents[1], 'data')
 LOG_DIR = join(Path(os.path.dirname(os.path.abspath(__file__))).parents[1], 'logs')
-TENSOR_NET_TYPES = ['cp', 'cpd', 'canonical', 'tucker', 'tucker2','train', 'tensor-train', 'tt', 'train2', 'tensor-train2', 'tt2']
+TENSOR_NET_TYPES = ['cp', 'cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt']
 KUL_PAL = ['#FF7251', '#C58B85', '#8CA5B8', '#52BEEC']
 KUL_PAL2 = ['#FF7251', '#E67D67', '#CE887D','#B59393','#9C9DAA','#83A8C0','#6BB3D6','#52BEEC']
 
