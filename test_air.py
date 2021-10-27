@@ -22,7 +22,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from torch import optim
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
-from layers.air_conv_alt import AirDoubleConvAlt
+from layers.air_conv import AirDoubleConv
 from models.air_unet import AirUNet
 from training.data_module import BraTSDataModule
 from training.inference import val_inference, test_inference
@@ -74,7 +74,8 @@ if __name__ == '__main__':
         network_params={
             'compression': compression,
             'tensor_net_type': tensor_net_type,
-            'double_conv': AirDoubleConvAlt,
+            'double_conv': AirDoubleConv,
+            'double_conv_params': {'comp_friendly': True},
             'in_channels': 4,
             'out_channels': 3,
             'widths': (32, 64, 128, 256, 320),
