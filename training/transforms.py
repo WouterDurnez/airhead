@@ -23,6 +23,7 @@ from monai.transforms import (
     RandShiftIntensityd,
     RandSpatialCropd,
     ToTensord,
+    EnsureChannelFirstD, EnsureChannelFirstd, ConvertToMultiChannelBasedOnBratsClassesd, Spacingd, Orientationd
 )
 
 
@@ -98,6 +99,10 @@ class OneHotEncoder(MapTransform):
 ################
 
 # Training transforms (including augmentation)
+class EnsureTyped:
+    pass
+
+
 def get_train_transform(patch_dim:int = 128):
     """
     DATA PREPARATION
@@ -117,29 +122,30 @@ def get_train_transform(patch_dim:int = 128):
     """
 
     transforms = [
-        LoadImaged(keys=["input", "target"], reader="ITKReader"),
-        OneHotEncoder(keys="target"),
-        CropForegroundd(keys=["input", "target"], source_key="input"),
+        LoadImaged(keys=["image", "label"], reader="ITKReader"),
+        OneHotEncoder(keys="label"),
+        CropForegroundd(keys=["image", "label"], source_key="image"),
         RandSpatialCropd(
-            keys=["input", "target"],
+            keys=["image", "label"],
             roi_size=[128, 128, 128],
             random_size=False,
         ),
-        RandFlipd(keys=["input", "target"], prob=0.5, spatial_axis=0),
+        RandFlipd(keys=["image", "label"], prob=0.5, spatial_axis=0),
         RandAffined(
-            keys=["input", "target"],
+            keys=["image", "label"],
             spatial_size=[patch_dim, patch_dim, patch_dim],
             prob=0.5,
             rotate_range=10,
             mode=("bilinear", "nearest"),
             as_tensor_output=False,
         ),
-        RandScaleIntensityd(keys="input", factors=0.1, prob=0.5),
-        RandShiftIntensityd(keys="input", offsets=0.1, prob=0.5),
-        NormalizeIntensityd(keys="input", nonzero=True, channel_wise=True),
-        ToTensord(keys=["input", "target"]),
+        RandScaleIntensityd(keys="image", factors=0.1, prob=0.5),
+        RandShiftIntensityd(keys="image", offsets=0.1, prob=0.5),
+        NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
+        ToTensord(keys=["image", "label"]),
     ]
     training_transform = Compose(transforms)
+
     return training_transform
 
 
@@ -158,23 +164,23 @@ def get_val_transform(patch_dim:int = 128):
     """
 
     transforms = [
-        LoadImaged(keys=["input", "target"], reader="ITKReader"),
-        OneHotEncoder(keys="target"),
-        CropForegroundd(keys=["input", "target"], source_key="input"),
+        LoadImaged(keys=["image", "label"], reader="ITKReader"),
+        OneHotEncoder(keys="label"),
+        CropForegroundd(keys=["image", "label"], source_key="image"),
         Resized(
-            keys=["input", "target"],
+            keys=["image", "label"],
             spatial_size=[patch_dim, patch_dim, patch_dim],
             mode=("trilinear", "nearest"),
         ),
-        NormalizeIntensityd(keys="input", nonzero=True, channel_wise=True),
-        ToTensord(keys=["input", "target"]),
+        NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
+        ToTensord(keys=["image", "label"]),
     ]
     validation_transform = Compose(transforms)
     return validation_transform
 
 
 # Test transforms
-# (leave image mostly intact! no cropping or resizing since we don't have target data)
+# (leave image mostly intact! no cropping or resizing since we don't have label data)
 def get_test_transform():
     """
     DATA PREPARATION
@@ -186,10 +192,10 @@ def get_test_transform():
     """
 
     transforms = [
-        LoadImaged(keys=["input","target"], reader="ITKReader"),
-        OneHotEncoder(keys="target"),
-        NormalizeIntensityd(keys="input", nonzero=True, channel_wise=True),
-        ToTensord(keys=["input", "target"]),
+        LoadImaged(keys=["image","label"], reader="ITKReader"),
+        OneHotEncoder(keys="label"),
+        NormalizeIntensityd(keys="image", nonzero=True, channel_wise=True),
+        ToTensord(keys=["image", "label"]),
     ]
     test_transform = Compose(transforms)
     return test_transform
@@ -200,15 +206,15 @@ def get_vis_transform():
     """
     DATA PREPARATION
     * read data
-    * add target channel
+    * add label channel
     * crop the foreground (i.e. crop brain out of volume)
     * convert to tensor
     """
     transforms = [
-        LoadImaged(keys=["input", "target"], reader="ITKReader"),
-        AddChanneld(keys=["target"]),
-        CropForegroundd(keys=["input", "target"], source_key="input"),
-        ToTensord(keys=["input", "target"]),
+        LoadImaged(keys=["image", "label"], reader="ITKReader"),
+        AddChanneld(keys=["label"]),
+        CropForegroundd(keys=["image", "label"], source_key="image"),
+        ToTensord(keys=["image", "label"]),
     ]
     visualisation_transforms = Compose(transforms)
     return visualisation_transforms
