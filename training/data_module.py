@@ -64,11 +64,11 @@ class BraTSDataModule(LightningDataModule):
         self.test_transform = get_test_transform()
         self.visualization_transform = get_vis_transform()
 
-        # To be initialized by setup (can be removed, but added for personal clarity)
+        # To be initialized by setup (can be removed, but added for clarity)
         self.data = None
         self.training_set, self.validation_set, self.test_set, self.visualization_set = None, None, None, None
 
-        # Set up crossvalidation data sets
+        # Set up cross validation data sets
         self.cross_val_ds = CrossValidation(
             dataset_cls=DecathlonDataset,
             nfolds=self.n_folds,
@@ -89,19 +89,25 @@ class BraTSDataModule(LightningDataModule):
 
         # Assign training datasets (train & val) for use in dataloaders
         if stage == "fit" or stage is None:
+
             # Build training and validation sets (monai Dataset subclass)
-            self.training_set = self.cross_val_ds.get_dataset(folds=[i for i in range(5) if i != self.fold_index])
+            train_folds = [i for i in range(5) if i != self.fold_index]
+            log(f'Training on folds {train_folds}.')
+            self.training_set = self.cross_val_ds.get_dataset(folds=train_folds)
+            log(f'Validating on fold {self.fold_index}.')
             self.validation_set = self.cross_val_ds.get_dataset(folds=self.fold_index,
                                                                 transform=self.validation_transform)
 
         # Assign test dataset for use in dataloader(s)
         if stage == "test" or stage is None:
+
             # Build test set
             self.test_set = self.cross_val_ds.get_dataset(folds=self.fold_index,
                                                           transform=self.test_transform)
 
         # Assign test dataset for visualization (inspect the results of our training)
         if stage == "visualize" or stage is None:
+
             # Build visualization set
             self.visualization_set = self.cross_val_ds.get_dataset(folds=self.fold_index,
                                                     transform=self.visualization_transform)
@@ -146,5 +152,5 @@ if __name__ == '__main__':
     # Use helper.set_params
     hi('Dry run for BraTS data module')
 
-    brats = BraTSDataModule(data_dir=DATA_DIR, fold_index=4, cache_rate=0.01)
+    brats = BraTSDataModule(data_dir=DATA_DIR, fold_index=4,cache_rate=.2)
     brats.setup()

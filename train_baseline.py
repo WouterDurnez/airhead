@@ -45,7 +45,7 @@ if __name__ == '__main__':
 
     # Parameters
     version = 0
-    fold_index = int(args.fold)
+    fold_index = int(args.fold) if args.fold else 0
     model_name = f'unet_baseline_f{fold_index}'
 
     # Set data directory
@@ -95,11 +95,12 @@ if __name__ == '__main__':
 
     # Initialize data module
     log("Initializing data module")
-    brats = BraTSDataModule(data_dir=join(data_dir,"MICCAI_BraTS2020_TrainingData"),
-                            num_workers=8,
+    brats = BraTSDataModule(data_dir=hlp.DATA_DIR,
+                            num_workers=1,
                             batch_size=1,
-                            fold_index=fold_index)
-    brats.setup()
+                            fold_index=fold_index,
+                            cache_rate=0.1)
+    brats.setup(stage='fit')
 
     # Initialize logger
     tb_logger = TensorBoardLogger(save_dir=tb_dir, name=model_name, default_hp_metric=False, version=version)
@@ -109,7 +110,7 @@ if __name__ == '__main__':
     trainer = Trainer(
         max_epochs=500,
         logger=tb_logger,
-        gpus=-1,
+        gpus=0,
         #num_nodes=8,
         deterministic=True,
         #distributed_backend='ddp',
