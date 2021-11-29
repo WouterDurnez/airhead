@@ -34,8 +34,8 @@ class UNetLightning(LightningModule):
         scheduler_config=None,
         inference=nn.Identity,
         inference_params=None,
-            test_inference=None,
-            test_inference_params=None,
+        test_inference=None,
+        test_inference_params=None,
         **kwargs,
     ):
         super().__init__(**kwargs)

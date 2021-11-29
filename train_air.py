@@ -20,14 +20,14 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch import optim
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 
 from layers.air_conv import AirDoubleConv
 from models.air_unet import AirUNet
 from training.data_module import BraTSDataModule
 from training.inference import val_inference, test_inference
 from training.lightning import UNetLightning
-from training.losses import dice_loss, dice_metric, dice_et, dice_tc, dice_wt, hd_metric, hd_et, hd_tc, hd_wt
+from training.losses import dice_loss
+from training.metrics import dice_metric, dice_et, dice_tc, dice_wt, hd_et, hd_tc, hd_wt
 from utils import helper as hlp
 from utils.helper import log, set_dir
 from utils.utils import WarmupCosineSchedule
@@ -84,7 +84,7 @@ if __name__ == '__main__':
         # Loss and metrics
         loss=dice_loss,
         metrics=[dice_metric, dice_et, dice_tc, dice_wt,
-                 hd_metric, hd_et, hd_tc, hd_wt],
+                 hd_et, hd_tc, hd_wt],
 
         # Optimizer
         optimizer=optim.AdamW,

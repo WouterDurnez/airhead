@@ -19,12 +19,14 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.loggers import TensorBoardLogger
 from torch import optim
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
+from medset.brats import BraTSDataModule as PooyaModule
+
 from models.baseline_unet import UNet
-from training.lightning import UNetLightning
 from training.data_module import BraTSDataModule
 from training.inference import val_inference, test_inference
-from training.losses import dice_loss, dice_metric, dice_et, dice_tc, dice_wt, hd_metric, hd_et, hd_tc, hd_wt
+from training.lightning import UNetLightning
+from training.losses import dice_loss #dice_metric, dice_et, dice_tc, dice_wt, hd_metric, hd_et, hd_tc, hd_wt
+from training.metrics import dice_metric, dice_et, dice_tc, dice_wt, hd_metric, hd_et, hd_tc, hd_wt
 from utils import helper as hlp
 from utils.helper import log
 from utils.helper import set_dir
@@ -34,19 +36,22 @@ pp = PrettyPrinter()
 
 if __name__ == '__main__':
     # Let's go
-    hlp.hi("Training baseline U-Net", log_dir='../logs_cv')
+    hlp.hi("Training baseline U-Net",
+           log_dir='../logs_cv',
+           data_dir='../data/')
 
     # Get arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--fold', help='Fold index')
     args = parser.parse_args()
 
-    log(f'Fold index:    {args.fold}', color='green')
-
     # Parameters
     version = 0
     fold_index = int(args.fold) if args.fold else 0
     model_name = f'unet_baseline_f{fold_index}'
+
+    log(f'Model name:    {model_name}', color='green')
+    log(f'Fold index:    {fold_index}', color='green')
 
     # Set data directory
     data_dir = hlp.DATA_DIR
@@ -70,7 +75,7 @@ if __name__ == '__main__':
         # Loss and metrics
         loss=dice_loss,
         metrics=[dice_metric, dice_et, dice_tc, dice_wt,
-                 hd_metric, hd_et, hd_tc, hd_wt],
+                 hd_et, hd_tc, hd_wt],
 
         # Optimizer
         optimizer=optim.AdamW,
@@ -82,8 +87,8 @@ if __name__ == '__main__':
         scheduler_params={"warmup_steps": 0, "total_steps": 100000},
 
         # Inference method
-        inference=val_inference,
-        inference_params=None,
+        inference=test_inference,
+        inference_params={'overlap':.5},
 
         # Test inference method
         test_inference=test_inference,
@@ -95,11 +100,12 @@ if __name__ == '__main__':
 
     # Initialize data module
     log("Initializing data module")
-    brats = BraTSDataModule(data_dir=hlp.DATA_DIR,
-                            num_workers=1,
+    '''brats = PooyaModule(root_dir=join(hlp.DATA_DIR,'Task01_BrainTumour'),
+                            num_workers=0,
                             batch_size=1,
-                            fold_index=fold_index,
-                            cache_rate=0.1)
+                            split=fold_index,
+                            cache_rate=0)'''
+    brats = BraTSDataModule(data_dir=join(hlp.DATA_DIR, 'MICCAI_BraTS2020_TrainingData'))
     brats.setup(stage='fit')
 
     # Initialize logger
