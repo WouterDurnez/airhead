@@ -24,7 +24,7 @@ from ptflops import get_model_complexity_info
 from sympy import Symbol, solve
 from torch import Tensor
 from torch.nn.functional import conv3d
-
+from models.baseline_unet import DoubleConv
 from utils.utils import get_tuning_par, get_network_size
 from utils.helper import log, hi, TENSOR_NET_TYPES
 
@@ -171,7 +171,7 @@ class AirConv3D(nn.Module):
 
         if self.tensor_net_type in ['cp', 'canonical', 'cpd']:
 
-            log(f'Creating CPD tensor network [compression rate = {self.compression}].', verbosity=3, color='magenta')
+            log(f'Creating CPD layer [compression rate = {self.compression}].', verbosity=3, color='magenta')
 
             # First, obtain rank based on compression rate
             self.rank = self._get_tuning_par()
@@ -217,7 +217,7 @@ class AirConv3D(nn.Module):
 
         elif self.tensor_net_type in ['tucker']:
 
-            log(f'Creating Tucker tensor network [compression rate = {self.compression}].', verbosity=3,
+            log(f'Creating Tucker layer [compression rate = {self.compression}].', verbosity=3,
                 color='magenta')
 
             """
@@ -263,10 +263,9 @@ class AirConv3D(nn.Module):
         # TENSOR TRAIN FORMAT #
         #######################
 
-        elif self.tensor_net_type in ['train', 'tensor-train', 'tt',
-                                      'train2', 'tensor-train2', 'tt2']:
+        elif self.tensor_net_type in ['train', 'tensor-train', 'tt']:
 
-            log(f'Creating Tensor Train network {("(alt version)" if self.tensor_net_type.endswith("2") else "")}'
+            log(f'Creating Tensor Train layer {("(alt version)" if self.tensor_net_type.endswith("2") else "")}'
                 f' [compression rate = {self.compression}].', verbosity=3, color='magenta')
 
             """
@@ -384,6 +383,7 @@ class AirConv3D(nn.Module):
             kernel_size=self.kernel_size
         )
 
+
     def _get_tensor_network_size(self) -> float:
         """
         Get the number of parameters involved in the kernel decomposition/tensor network,
@@ -434,6 +434,8 @@ class AirConv3D(nn.Module):
             if self.bias is not None:
                 output += self.bias[None, :, None, None, None]  # <-- cast across remaining dimensions
 
+            output = output.contiguous()
+
         return output
 
 
@@ -449,19 +451,21 @@ class AirDoubleConv(nn.Module):
             num_groups=8,
             strides=(2, 1),
             activation=nn.LeakyReLU(inplace=True),
-            conv_par=None,
-            comp_friendly:bool = False,
+            double_conv_par=None,
+            comp_friendly:bool = True,
             __name__='low_rank_double_conv',
     ):
         super().__init__()
         self.__name__ = __name__
+        self.comp_friendly = comp_friendly
 
         # Initialize convolution parameters
-        conv_par = conv_par if conv_par else {}
+        double_conv_par = double_conv_par if double_conv_par else {}
 
         # Set parameters (if not given!)
-        conv_par.setdefault('kernel_size', 3)
-        conv_par.setdefault('padding', 1)
+        double_conv_par.setdefault('kernel_size', 3)
+        double_conv_par.setdefault('padding', 1)
+        double_conv_par.setdefault('comp_friendly', self.comp_friendly)
 
         # Define inner block architecture
         self.block = nn.Sequential(
@@ -473,8 +477,8 @@ class AirDoubleConv(nn.Module):
                 out_channels=out_channels,
                 stride=strides[0],
                 tensor_net_type=tensor_net_type,
-                comp_friendly=comp_friendly,
-                **conv_par
+                #comp_friendly=comp_friendly,
+                **double_conv_par
             ),
 
             # Normalization layer (default minibatch of 8 instances)
@@ -490,8 +494,8 @@ class AirDoubleConv(nn.Module):
                 out_channels=out_channels,
                 stride=strides[1],
                 tensor_net_type=tensor_net_type,
-                comp_friendly=comp_friendly,
-                **conv_par
+                #comp_friendly=comp_friendly,
+                **double_conv_par
             ),
 
             # Normalization layer (default minibatch of 8 instances)
@@ -568,20 +572,13 @@ if __name__ == '__main__':
     assert tt_output.size() == classic_output.size(), "Something went wrong with TT format, output shapes don't match!"
 
     # Double conv test
-    """double_conv_classic = DoubleConv(in_channels=in_channels, out_channels=out_channels)
+    double_conv_classic = DoubleConv(in_channels=in_channels, out_channels=out_channels)
     double_conv_classic_output = double_conv_classic(image)
     double_conv_cpd = AirDoubleConv(compression=compression, tensor_net_type='cpd', in_channels=in_channels,
                                     out_channels=out_channels, num_groups=8)
     double_conv_cpd_output = double_conv_cpd(image)
-
+    """
     assert double_conv_cpd_output.size() == double_conv_classic_output.size(), "Something went wrong with double conv CPD, output shapes don't match!"
     """
 
-    # Attempt to get flop count --> failed for tensor network versions!
-    for name, model in zip(('regular', 'cpd', 'tucker', 'tt'), (layer_classic, layer_canon, layer_tucker, layer_tt)):
-        macs, params = get_model_complexity_info(model=model, input_res=(4, 128, 128, 128), as_strings=True,
-                                                 print_per_layer_stat=False, verbose=False,
-                                                 custom_modules_hooks={AirConv3D: count_lr_conv3d})
-        # flops = count_ops(model=model, input=image,verbose=False)
-        # print(name, '-->\tmacs: ', macs,'\tparams: ', params,'\tflops', flops)
-        print(name, 'macs', macs, 'params', params)
+

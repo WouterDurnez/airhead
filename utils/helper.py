@@ -17,7 +17,7 @@ VERBOSITY = 3
 TIMESTAMPED = True
 DATA_DIR = join(Path(os.path.dirname(os.path.abspath(__file__))).parents[1], 'data')
 LOG_DIR = join(Path(os.path.dirname(os.path.abspath(__file__))).parents[1], 'logs')
-TENSOR_NET_TYPES = ['cp', 'cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt']
+TENSOR_NET_TYPES = ('cp', 'cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt')
 KUL_PAL = ['#FF7251', '#C58B85', '#8CA5B8', '#52BEEC']
 KUL_PAL2 = ['#FF7251', '#E67D67', '#CE887D','#B59393','#9C9DAA','#83A8C0','#6BB3D6','#52BEEC']
 
@@ -34,9 +34,6 @@ def set_params(verbosity: int = None, timestamped: bool = None, data_dir: str = 
     TIMESTAMPED = timestamped if timestamped is not None else TIMESTAMPED
     DATA_DIR = data_dir if data_dir else DATA_DIR
     LOG_DIR = log_dir if log_dir else LOG_DIR
-
-    DATA_DIR = os.path.abspath(DATA_DIR)
-    LOG_DIR = os.path.abspath(LOG_DIR)
 
 
 def hi(title=None, **params):
@@ -61,10 +58,6 @@ def hi(title=None, **params):
     if params:
         set_params(**params)
 
-    log(f"VERBOSITY is set to {VERBOSITY}", verbosity=1, timestamped=False, color='green')
-    log(f"TIMESTAMPED is set to {TIMESTAMPED}", verbosity=1, timestamped=False, color='green')
-    log(f"DATA_DIR is now set to {os.path.abspath(DATA_DIR)}", timestamped=False, verbosity=1, color='green')
-    log(f"LOG_DIR is set to {os.path.abspath(LOG_DIR)}", timestamped=False, verbosity=1, color='green')
     print()
 
     # Set directories

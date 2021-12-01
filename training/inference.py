@@ -12,6 +12,7 @@ from itertools import product
 from os.path import join
 
 import SimpleITK as sitk
+import torch.nn as nn
 from monai.inferers import sliding_window_inference
 from monai.transforms import Activations, AsDiscrete
 from monai.transforms import Compose
@@ -24,6 +25,7 @@ from models.baseline_unet import UNet
 from training.data_module import BraTSDataModule
 from training.lightning import UNetLightning
 from training.losses import *
+from training.metrics import dice_metric, dice_et, dice_tc, dice_wt, hd_et, hd_tc, hd_wt
 
 
 ####################################################
@@ -47,7 +49,7 @@ def val_inference(input: torch.Tensor, model: nn.Module):
     # * Sigmoid activation layer (if needed)
     # * Threshold the values to 0 or 1
 
-    post_trans_list = [AsDiscrete(threshold_values=True)]
+    post_trans_list = [AsDiscrete(threshold=.5)]
 
     # If it's the right type of model, containing our 'head' parameter,
     # check if the head is there, otherwise add sigmoid as posttransform
@@ -62,7 +64,7 @@ def val_inference(input: torch.Tensor, model: nn.Module):
     return output
 
 
-def test_inference(input: torch.Tensor, model: nn.Module, roi_dim:int = 128, **kwargs):
+def test_inference(input: torch.Tensor, model: nn.Module, roi_dim: int = 128, **kwargs):
     """
     Inference function for test data, using sliding window
 
@@ -106,7 +108,7 @@ def predict(model: torch.nn.Module, sample: dict, device: torch.device, model_na
         hlp.set_dir(write_dir)
 
     # Unpack
-    #subject = sample['id']
+    # subject = sample['id']
     image = sample['input'].to(device)
     image = image.unsqueeze(0)
 
@@ -123,17 +125,13 @@ if __name__ == '__main__':
 
     # Set parameters
     fold_index = 0
-    #model_name = f'unet_baseline_f{fold_index}'
-
-    models = [('baseline',0)]
+    models = [('baseline', 0)]
     models += list(product(
-        ('cpd','tt','tt2','tucker'),
-        (2,5,10,20,50,100)
+        ('cpd', 'tt', 'tucker'),
+        (2, 5, 10, 20, 35, 50, 75, 100)
     ))
 
-
     for type, version in tqdm(models, desc='Predicting segmentation'):
-
         model_name = f'unet_{type}_f{fold_index}'
         write_dir = join(hlp.DATA_DIR, 'predictions')
         hlp.set_dir(write_dir)
@@ -153,7 +151,7 @@ if __name__ == '__main__':
             # Loss and metrics
             loss=dice_loss,
             metrics=[dice_metric, dice_et, dice_tc, dice_wt,
-                     hd_metric, hd_et, hd_tc, hd_wt],
+                     hd_et, hd_tc, hd_wt],
 
             # Optimizer
             optimizer=optim.AdamW,
@@ -174,7 +172,8 @@ if __name__ == '__main__':
         )
 
         # Load from checkpoint
-        checkpoint_path = join(hlp.LOG_DIR, 'snapshots',model_name, f'final_{model_name}_v{version}_fold{fold_index}.ckpt')
+        checkpoint_path = join(hlp.LOG_DIR, 'snapshots', model_name,
+                               f'final_{model_name}_v{version}_fold{fold_index}.ckpt')
 
         model = model.load_from_checkpoint(checkpoint_path=checkpoint_path)
         model = model.to(device)
@@ -193,6 +192,7 @@ if __name__ == '__main__':
         sample = brats.test_set[16]
 
         with torch.no_grad():
-            test = predict(model=model, sample=sample, model_name=model_name, device=device, write_dir=write_dir).detach()
+            test = predict(model=model, sample=sample, model_name=model_name, device=device,
+                           write_dir=write_dir).detach()
         test = sitk.GetImageFromArray(test.cpu().numpy())
         sitk.WriteImage(image=test, fileName=join(write_dir, f'{model_name}_v{version}_2.nii.gz'))

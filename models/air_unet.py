@@ -30,6 +30,7 @@ class AirUNet(nn.Module):
             double_conv=AirDoubleConv,
             double_conv_params=None,
             downsample='strided_convolution',
+            comp_friendly:bool=True,
             up_par=None,
             head=True
     ):
@@ -42,8 +43,10 @@ class AirUNet(nn.Module):
         self.out_channels = out_channels
         self.widths = widths
         self.head = head
+        self.comp_friendly = comp_friendly
 
-        assert downsample == 'strided_convolution', 'Adjust model architecture to use downsample method other than strided convolution!'
+        assert downsample == 'strided_convolution',\
+            'Adjust model architecture to use downsample method other than strided convolution!'
 
         ##############
         # Parameters #
@@ -53,6 +56,7 @@ class AirUNet(nn.Module):
         double_conv_params = double_conv_params if double_conv_params else {}
         double_conv_params.setdefault('kernel_size', 3)
         double_conv_params.setdefault('padding', 1)
+        double_conv_params.setdefault('comp_friendly', self.comp_friendly)
 
         # Set default parameters for upsampling (transposed convolution)
         up_par = up_par if up_par else {}
@@ -70,24 +74,24 @@ class AirUNet(nn.Module):
         """
         self.enc_1 = double_conv(compression=self.compression, tensor_net_type=self.tensor_net_type,
                                  in_channels=self.in_channels, out_channels=self.widths[0],
-                                 strides=(1, 1), activation=activation, conv_par=double_conv_params)
+                                 strides=(1, 1), activation=activation, double_conv_par=double_conv_params)
         self.enc_2 = double_conv(compression=self.compression, tensor_net_type=self.tensor_net_type,
                                  in_channels=self.widths[0], out_channels=self.widths[1],
-                                 activation=activation, conv_par=double_conv_params)
+                                 activation=activation, double_conv_par=double_conv_params)
         self.enc_3 = double_conv(compression=self.compression, tensor_net_type=self.tensor_net_type,
                                  in_channels=self.widths[1], out_channels=self.widths[2],
-                                 activation=activation, conv_par=double_conv_params)
+                                 activation=activation, double_conv_par=double_conv_params)
         self.enc_4 = double_conv(compression=self.compression, tensor_net_type=self.tensor_net_type,
                                  in_channels=self.widths[2], out_channels=self.widths[3],
-                                 activation=activation, conv_par=double_conv_params)
+                                 activation=activation, double_conv_par=double_conv_params)
         self.enc_5 = double_conv(compression=self.compression, tensor_net_type=self.tensor_net_type,
                                  in_channels=self.widths[3], out_channels=self.widths[4],
-                                 activation=activation, conv_par=double_conv_params)
+                                 activation=activation, double_conv_par=double_conv_params,
+                                 comp_friendly=self.comp_friendly)
 
         # BRIDGE
         self.bridge = AirDoubleConv(compression=self.compression, tensor_net_type=self.tensor_net_type,
                                     in_channels=self.widths[4], out_channels=self.widths[4])
-
         # DECODER
         """
         5 segments composed of transposed convolutions (upsampling) and double convolution blocks
@@ -95,24 +99,23 @@ class AirUNet(nn.Module):
         self.up_1 = Upsample(self.widths[4], self.widths[4], up_par=up_par)
         self.dec_1 = double_conv(compression=self.compression, tensor_net_type=self.tensor_net_type,
                                  in_channels=2 * self.widths[4], out_channels=self.widths[3], strides=(1, 1),
-                                 activation=activation,
-                                 conv_par=double_conv_params)  # double the filters due to concatenation
+                                 activation=activation, double_conv_par=double_conv_params)  # double the filters due to concatenation
         self.up_2 = Upsample(self.widths[3], self.widths[3], up_par=up_par)
         self.dec_2 = double_conv(compression=self.compression, tensor_net_type=self.tensor_net_type,
                                  in_channels=2 * self.widths[3], out_channels=self.widths[2], strides=(1, 1),
-                                 activation=activation, conv_par=double_conv_params)
+                                 activation=activation, double_conv_par=double_conv_params)
         self.up_3 = Upsample(self.widths[2], self.widths[2], up_par=up_par)
         self.dec_3 = double_conv(compression=self.compression, tensor_net_type=self.tensor_net_type,
                                  in_channels=2 * self.widths[2], out_channels=self.widths[1], strides=(1, 1),
-                                 activation=activation, conv_par=double_conv_params)
+                                 activation=activation, double_conv_par=double_conv_params)
         self.up_4 = Upsample(self.widths[1], self.widths[1], up_par=up_par)
         self.dec_4 = double_conv(compression=self.compression, tensor_net_type=self.tensor_net_type,
                                  in_channels=2 * self.widths[1], out_channels=self.widths[0], strides=(1, 1),
-                                 activation=activation, conv_par=double_conv_params)
+                                 activation=activation, double_conv_par=double_conv_params)
         self.up_5 = Upsample(self.widths[0], self.widths[0], up_par=up_par)
         self.dec_5 = double_conv(compression=self.compression, tensor_net_type=self.tensor_net_type,
                                  in_channels=2 * self.widths[0], out_channels=self.widths[0], strides=(1, 1),
-                                 activation=activation, conv_par=double_conv_params)
+                                 activation=activation, double_conv_par=double_conv_params)
 
         # Output
         self.final_conv = nn.Conv3d(in_channels=self.widths[0], out_channels=out_channels, kernel_size=1)
@@ -179,10 +182,10 @@ if __name__ == '__main__':
     log(f'Input size (single image): {x.size()}')
 
     # Initialize model
-    lr_unet = AirUNet(compression=2, tensor_net_type='cpd',
+    lr_unet = AirUNet(compression=2, tensor_net_type='cpd',comp_friendly=True,
                       in_channels=4, out_channels=3, head=False, downsample='strided_convolution')
 
     # Process example input
-    #out = lr_unet(x)
+    out = lr_unet(x)
     #out2 = model2(x)
     #log(f'Output size (single image): {out.size()}')
