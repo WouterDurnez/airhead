@@ -36,8 +36,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # Parameters
-    net_type = args.type
-    assert net_type in TENSOR_NET_TYPES, \
+    net_type = args.type if args.type else 'base'
+    assert net_type in TENSOR_NET_TYPES or net_type == 'base', \
         f"Choose a valid network type ('base','cp', 'tucker', or 'tt')!"
 
     # Baseline or tensorized?
@@ -60,7 +60,7 @@ if __name__ == '__main__':
     # Let's go
     hlp.hi("Training lightweight U-Net", log_dir=config['logs']['log_dir'])
 
-    fold_index = int(args.fold)
+    fold_index = int(args.fold) if args.fold else 0
     model_name = f'unet_{net_type}_f{fold_index}'
 
     log(f'Network type: {args.type}', color='green')

@@ -241,7 +241,7 @@ class AirConv3D(nn.Module):
             self.r2 = round(self.out_channels / self.S) if round(self.out_channels / self.S) > 0 else 1
 
             # Let's start with the core tensor
-            nodes['G'] = { # TODO FIX THIS MESS
+            nodes['G'] = {
                 'tensor': Tensor(self.r1, self.kernel_size, self.kernel_size, self.kernel_size, self.r2),
                 'shape': (self.r1, self.kernel_size, self.kernel_size, self.kernel_size, self.r2),
                 'legs': ['r1', 'k_h','k_w','k_d','r2'] if not self.comp_friendly else ['r1', '-k_h','-k_w','-k_d','r2']

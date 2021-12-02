@@ -7,7 +7,7 @@
 """
 Get parameters (flops/macs) for all networks
 """
-
+import os
 from os.path import join
 from pprint import PrettyPrinter
 
@@ -17,15 +17,18 @@ from ptflops import get_model_complexity_info
 from layers.air_conv import count_lr_conv3d, AirConv3D, AirDoubleConv
 from models.air_unet import AirUNet
 from models.baseline_unet import UNet
-from utils.helper import log, hi, LOG_DIR
+from utils.helper import log, hi
+import utils.helper as hlp
 
 pp = PrettyPrinter()
 
 if __name__ == '__main__':
 
-    hi('Flop/mac counter', verbosity=1, log_dir='../../logs_cv')
+    hi('Flop/mac counter', verbosity=1,
+       data_dir='../data',
+       log_dir='../logs/flops')
 
-    result_dir = join(LOG_DIR, 'results')
+    result_dir = join(hlp.LOG_DIR, 'results')
 
     # Store all info here
     info = {}
@@ -66,7 +69,7 @@ if __name__ == '__main__':
                             double_conv=AirDoubleConv,
                             in_channels=4,
                             out_channels=3,
-                            comp_friendly=False)
+                            comp_friendly=True)
 
             # Get macs and parameters (using custom hook)
             macs, params = get_model_complexity_info(model=model, input_res=(4, 128, 128, 128), as_strings=False,
@@ -81,4 +84,4 @@ if __name__ == '__main__':
             }
 
     # Store all info
-    np.save('model_flops.npy', info)
+    np.save(os.path.join(hlp.LOG_DIR,'model_flops.npy'), info)

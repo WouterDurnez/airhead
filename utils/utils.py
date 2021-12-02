@@ -7,10 +7,10 @@
 """
 Various utilities
 """
-
+import inspect
 import os
 from os.path import join
-
+import sys
 import math
 import matplotlib.pyplot as plt
 import numpy as np
@@ -20,6 +20,10 @@ from pytorch_lightning.callbacks import Callback
 from sympy import Symbol
 from sympy.solvers import solve
 from torch.optim.lr_scheduler import LambdaLR
+
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0, parentdir)
 
 import utils.helper as hlp
 from utils.helper import KUL_PAL, TENSOR_NET_TYPES
@@ -114,8 +118,6 @@ class TakeSnapshot(Callback):
 # Compression/rank tradeoff #
 #############################
 
-# TODO: clean up, moved function to LowRank class
-
 def get_tuning_par(compression: int, tensor_net_type: str, in_channels: int, out_channels: int,
                    kernel_size: int = 3) -> int:
     """
@@ -139,15 +141,15 @@ def get_tuning_par(compression: int, tensor_net_type: str, in_channels: int, out
     # CPD #
     #######
 
-    if tensor_net_type in ['cpd', 'canonical']:
+    if tensor_net_type in ('cp', 'cpd', 'canonical'):
         ''''
         cpd_params:
         r * (in_channels + out_channels + 3 * kernel_size)
         
         compression = max_params / cpd_params
         '''
-
         rank = max_params / (compression * (in_channels + out_channels + 3 * kernel_size))
+        log(f'Calculating tuning variable for {tensor_net_type} (comp={compression}; Cin={in_channels}; Cout={out_channels}; kernel={kernel_size}: r = {rank}', verbosity=3)
         return round(rank)
 
     ##########
@@ -210,14 +212,13 @@ def get_network_size(tuning_param: float, tensor_net_type: str, in_channels: int
                      kernel_size: int = 3) -> float:
 
     # Make sure the right type of tensor network was passed
-    types = ['cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt']
-    assert tensor_net_type in types, f"Choose a valid tensor network {types}"
+    assert tensor_net_type in TENSOR_NET_TYPES, f"Choose a valid tensor network {TENSOR_NET_TYPES}"
 
     #######
     # CPD #
     #######
 
-    if tensor_net_type in ['cpd', 'canonical']:
+    if tensor_net_type in ['cp', 'cpd', 'canonical']:
         ''''
         cpd_params:
         r * (in_channels + out_channels + 3 * kernel_size)

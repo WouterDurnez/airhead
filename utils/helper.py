@@ -164,7 +164,7 @@ def set_dir(*dirs):
 
     for dir in dirs:
         if not os.path.exists(dir):
-            os.makedirs(dir)
+            os.makedirs(dir,exist_ok=True)
             log("WARNING: Data directory <{dir}> did not exist yet, and was created.".format(dir=dir), verbosity=1)
         else:
             log("\'{}\' folder accounted for.".format(dir), verbosity=3)
