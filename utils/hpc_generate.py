@@ -24,9 +24,8 @@ if __name__ == '__main__':
                 '#BASELINE\n')
 
         for fold in range(5):
-            command = f'qsub jobscript.pbs -v TYPE=base,FOLD={fold}\n'
-
-        f.write(command)
+            command = f'qsub jobscript_air.pbs -v TYPE=base,COMP=1,FOLD={fold}\n'
+            f.write(command)
 
 
     h.log('Creating tensorized jobscripts...')
@@ -34,8 +33,8 @@ if __name__ == '__main__':
 
         with open(f'../jobscripts/jobs_air_batch_fold{fold}.sh', 'w') as f:
 
-            f.write('#!/bin/bash\n'
-                    '\n#FOLD {fold}\n')
+            f.write(f'#!/bin/bash\n'
+                    f'\n#FOLD {fold}\n')
 
             for comp in (2, 5, 10, 20, 35, 50, 75, 100):
 

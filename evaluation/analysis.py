@@ -56,16 +56,18 @@ def process_results(results: dict, type: str, fold: int, compression: int, macs:
 
 
 if __name__ == '__main__':
-    hlp.hi('Analysis', log_dir='../../logs_cv')
+
+    hlp.hi('Analysis', log_dir='../../logs')
     vis_dir = join(hlp.DATA_DIR, 'visuals')
     rebuild = True
+
     # Get all results files
     files = glob(join(hlp.LOG_DIR, 'results', '*', '*'))
     files = [f for f in files if f.endswith('.npy')]
 
     # Get flops and params
     #flops_params = np.load(join(hlp.LOG_DIR, 'model_flops.npy'), allow_pickle=True).item()
-    flops_params = np.load('model_flops3.npy', allow_pickle=True).item()
+    flops_params = np.load('model_flops.npy', allow_pickle=True).item()
     #flops_params['tucker'] = flops_params['tucker2']
 
     if rebuild:
