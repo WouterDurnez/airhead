@@ -149,7 +149,6 @@ def get_tuning_par(compression: int, tensor_net_type: str, in_channels: int, out
         compression = max_params / cpd_params
         '''
         rank = max_params / (compression * (in_channels + out_channels + 3 * kernel_size))
-        log(f'Calculating tuning variable for {tensor_net_type} (comp={compression}; Cin={in_channels}; Cout={out_channels}; kernel={kernel_size}: r = {rank}', verbosity=3)
         return round(rank)
 
     ##########

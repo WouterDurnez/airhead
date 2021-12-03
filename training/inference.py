@@ -21,7 +21,7 @@ from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from tqdm import tqdm
 
 import utils.helper as hlp
-from models.baseline_unet import UNet
+from models.base_unet import UNet
 from training.data_module import BraTSDataModule
 from training.lightning import UNetLightning
 from training.losses import *
