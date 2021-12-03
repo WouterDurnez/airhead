@@ -1,10 +1,13 @@
+from copy import deepcopy
+
 from pl_bolts.callbacks import PrintTableMetricsCallback
 from pytorch_lightning.callbacks import LearningRateMonitor
 from torch.optim import AdamW
-from copy import deepcopy
-from layers.air_conv import AirDoubleConv
+
+from layers.air_conv import AirDoubleConvBlock, AirResBlock
+from layers.base_layers import DoubleConvBlock, ResBlock
 from models.air_unet import AirUNet
-from models.baseline_unet import UNet
+from models.base_unet import UNet
 from training.inference import test_inference
 from training.losses import dice_loss
 from training.metrics import *
@@ -67,6 +70,7 @@ GENERAL = {
 BASE_MODEL = {
     'network': UNet,
     'network_params': {
+        'core_block': ResBlock,
         'in_channels': 4,
         'out_channels': 3,
         'widths': (32, 64, 128, 256, 320),
@@ -75,8 +79,8 @@ BASE_MODEL = {
 AIR_MODEL = {
     'network': AirUNet,
     'network_params': {
-        'double_conv': AirDoubleConv,
-        'double_conv_params': {
+        'core_block': AirResBlock,
+        'core_block_conv_params': {
             'comp_friendly': True
         },
         'in_channels': 4,

@@ -5,41 +5,36 @@
 #
 
 """
-Lightweight U-Net
+3D U-Net implementation as described in
+Isensee, F., Jaeger, P. F., Full, P. M., Vollmuth, P., & Maier-Hein, K. H. (2020).
+ nnU-Net for Brain Tumor Segmentation. 1–15. http://arxiv.org/abs/2011.00848
 """
+
 import torch
 import torch.nn as nn
 from torch import cat
+from utils.helper import *
+import numpy as np
+from layers.base_layers import DoubleConvBlock, Upsample, ResBlock
+from utils.helper import time_it
 
-from layers.air_conv import AirDoubleConvBlock, AirConv3D, AirResBlock
-from layers.base_layers import Upsample
-from utils.helper import log, set_params
-
-
-# Low-Rank 3D-UNet architecture
-class AirUNet(nn.Module):
+# Full 3D-UNet architecture
+class UNet(nn.Module):
     def __init__(
             self,
-            compression: int,
-            tensor_net_type: str,
-            in_channels: int,
-            out_channels: int,
+            in_channels,
+            out_channels,
             widths=(32, 64, 128, 256, 320),
-            activation=nn.LeakyReLU,
-            core_block: nn.Module = AirDoubleConvBlock,
+            activation:nn.Module=nn.LeakyReLU,
+            core_block:nn.Module=DoubleConvBlock,
             core_block_conv_params: dict = None,
-            downsample='strided_convolution',
-            comp_friendly: bool = True,
+            downsample = 'strided_convolution',
             up_par=None,
             head=True
     ):
         super().__init__()
 
         # Set attributes
-        self.compression = compression
-        self.tensor_net_type = tensor_net_type
-        self.comp_friendly = comp_friendly
-
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.widths = widths
@@ -57,13 +52,6 @@ class AirUNet(nn.Module):
         core_block_conv_params.setdefault('kernel_size', 3)
         core_block_conv_params.setdefault('padding', 1)
 
-        # Set tensor net parameters
-        air_params = {
-            'tensor_net_type': self.tensor_net_type,
-            'compression': self.compression,
-            'comp_friendly': self.comp_friendly
-        }
-
         # Set default parameters for upsampling (transposed convolution)
         up_par = up_par if up_par else {}
         up_par.setdefault('kernel_size', 3)
@@ -80,45 +68,42 @@ class AirUNet(nn.Module):
         5 segments composed of double convolution blocks, followed by strided convolutoin (downsampling)
         """
         self.enc_1 = core_block(in_channels=self.in_channels, out_channels=self.widths[0],
-                                stride=1, activation=activation, conv_params=core_block_conv_params, **air_params)
+                                stride=1, activation=activation, conv_params=core_block_conv_params)
         self.enc_2 = core_block(in_channels=self.widths[0], out_channels=self.widths[1],
-                                activation=activation, conv_params=core_block_conv_params, **air_params)
+                                activation=activation, conv_params=core_block_conv_params)
         self.enc_3 = core_block(in_channels=self.widths[1], out_channels=self.widths[2],
-                                activation=activation, conv_params=core_block_conv_params, **air_params)
+                                activation=activation, conv_params=core_block_conv_params)
         self.enc_4 = core_block(in_channels=self.widths[2], out_channels=self.widths[3],
-                                activation=activation, conv_params=core_block_conv_params, **air_params)
+                                activation=activation, conv_params=core_block_conv_params)
         self.enc_5 = core_block(in_channels=self.widths[3], out_channels=self.widths[4],
-                                activation=activation, conv_params=core_block_conv_params,**air_params)
+                                activation=activation, conv_params=core_block_conv_params)
 
         # BRIDGE
-        self.bridge = AirDoubleConvBlock(in_channels=self.widths[4], out_channels=self.widths[4], **air_params)
+        self.bridge = core_block(self.widths[4], self.widths[4])
+
         # DECODER
         """
         5 segments composed of transposed convolutions (upsampling) and double convolution blocks
         """
         self.up_1 = Upsample(self.widths[4], self.widths[4], up_par=up_par)
-        self.dec_1 = core_block(in_channels=2 * self.widths[4], out_channels=self.widths[3], stride=1,
-                                activation=activation, conv_params=core_block_conv_params, **air_params)  # double the filters due to concatenation
+        self.dec_1 = core_block(2 * self.widths[4], self.widths[3], stride=1, activation=activation, conv_params=core_block_conv_params)  # double the filters due to concatenation
         self.up_2 = Upsample(self.widths[3], self.widths[3], up_par=up_par)
-        self.dec_2 = core_block(in_channels=2 * self.widths[3], out_channels=self.widths[2], stride=1,
-                                activation=activation, conv_params=core_block_conv_params, **air_params)
+        self.dec_2 = core_block(2 * self.widths[3], self.widths[2], stride=1, activation=activation, conv_params=core_block_conv_params)
         self.up_3 = Upsample(self.widths[2], self.widths[2], up_par=up_par)
-        self.dec_3 = core_block(in_channels=2 * self.widths[2], out_channels=self.widths[1], stride=1,
-                                activation=activation, conv_params=core_block_conv_params, **air_params)
+        self.dec_3 = core_block(2 * self.widths[2], self.widths[1], stride=1, activation=activation, conv_params=core_block_conv_params)
         self.up_4 = Upsample(self.widths[1], self.widths[1], up_par=up_par)
-        self.dec_4 = core_block(in_channels=2 * self.widths[1], out_channels=self.widths[0], stride=1,
-                                activation=activation, conv_params=core_block_conv_params, **air_params)
+        self.dec_4 = core_block(2 * self.widths[1], self.widths[0], stride=1, activation=activation, conv_params=core_block_conv_params)
         self.up_5 = Upsample(self.widths[0], self.widths[0], up_par=up_par)
-        self.dec_5 = core_block(in_channels=2 * self.widths[0], out_channels=self.widths[0], stride=1,
-                                activation=activation, conv_params=core_block_conv_params, **air_params)
+        self.dec_5 = core_block(2 * self.widths[0], self.widths[0], stride=1, activation=activation, conv_params=core_block_conv_params)
 
         # Output
-        self.final_conv = AirConv3D(in_channels=self.widths[0], out_channels=out_channels, kernel_size=1, **air_params)
+        self.final_conv = nn.Conv3d(in_channels=self.widths[0], out_channels=out_channels, kernel_size=1)
         if self.head:
-            # self.final_act = nn.Softmax(dim=1)
+            #self.final_act = nn.Softmax(dim=1)
             self.final_act = nn.Sigmoid()
 
     # Forward propagation
+    @time_it
     def forward(self, input):
         """
         Combine layers into encoder-decoder structure, adding skip connections
@@ -159,7 +144,7 @@ class AirUNet(nn.Module):
         if self.head:
             output = self.final_act(final_conv)
         else:
-            output = final_conv
+            output=final_conv
 
         return output
 
@@ -172,19 +157,18 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Create appropriately dimensioned tensor with random values
-    dim = 96
+    dim = 128
     x = torch.rand(1, 4, dim, dim, dim)
     x.to(device)
     log(f'Input size (single image): {x.size()}')
 
     # Initialize model
-    lr_unet = AirUNet(compression=2, tensor_net_type='cpd', comp_friendly=True,
-                      in_channels=4, out_channels=3, head=False)
+    base_model = UNet(in_channels=4, out_channels=3, head=False)
+    res_model = UNet(in_channels=4, out_channels=3, head=False,core_block=ResBlock)
 
-    lr_unet_res = AirUNet(core_block=AirResBlock, compression=2, tensor_net_type='cpd', comp_friendly=True,
-                      in_channels=4, out_channels=3, head=False)
     # Process example input
-    out_lr = lr_unet(x)
-    out_lr_res = lr_unet_res(x)
-    log(f'Output size (double conv block): {out_lr.size()}')
-    log(f'Output size (res block): {out_lr_res.size()}')
+    out_base = base_model(x)
+    out_res = res_model(x)
+    log(f'Output size (base): {out_base.size()}')
+    log(f'Output size (res): {out_res.size()}')
+

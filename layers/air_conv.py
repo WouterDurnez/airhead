@@ -11,22 +11,21 @@ Lightweight convolutional layers
  * TUCKER FORMAT
  * TENSOR TRAIN FORMAT
 """
-
+import copy
+import math
 from pprint import PrettyPrinter
 
-import math
 import numpy as np
 import opt_einsum as oe
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from ptflops import get_model_complexity_info
-from sympy import Symbol, solve
 from torch import Tensor
 from torch.nn.functional import conv3d
-from models.baseline_unet import DoubleConv
-from utils.utils import get_tuning_par, get_network_size
+
+from models.base_unet import DoubleConvBlock
 from utils.helper import log, hi, TENSOR_NET_TYPES
+from utils.utils import get_tuning_par, get_network_size
 
 pp = PrettyPrinter(4)
 
@@ -128,7 +127,7 @@ class AirConv3D(nn.Module):
         if bias:
             self.bias = nn.Parameter(torch.randn(self.out_channels))
         else:
-            self.register_parameter("bias", None)
+            self.bias = None
 
         # Get contraction with optimal path
         self.einsum_expression, self.path_info = self._get_contraction()
@@ -203,7 +202,7 @@ class AirConv3D(nn.Module):
             nodes['U_c_in'] = {
                 "tensor": Tensor(self.in_channels, self.rank),
                 "shape": (self.in_channels, self.rank),
-                "legs": ['c_in', 'r'] if not self.comp_friendly else ['-c_in','r']
+                "legs": ['c_in', 'r'] if not self.comp_friendly else ['-c_in', 'r']
             }
             nodes['U_c_out'] = {
                 "tensor": Tensor(self.rank, self.out_channels),
@@ -244,14 +243,15 @@ class AirConv3D(nn.Module):
             nodes['G'] = {
                 'tensor': Tensor(self.r1, self.kernel_size, self.kernel_size, self.kernel_size, self.r2),
                 'shape': (self.r1, self.kernel_size, self.kernel_size, self.kernel_size, self.r2),
-                'legs': ['r1', 'k_h','k_w','k_d','r2'] if not self.comp_friendly else ['r1', '-k_h','-k_w','-k_d','r2']
+                'legs': ['r1', 'k_h', 'k_w', 'k_d', 'r2'] if not self.comp_friendly else ['r1', '-k_h', '-k_w', '-k_d',
+                                                                                          'r2']
             }
 
             # Finally, add factor matrices for input and output channels
             nodes['U_c_in'] = {
                 "tensor": Tensor(self.in_channels, self.r1),
                 "shape": (self.in_channels, self.r1),
-                "legs": ['c_in', 'r1'] if not self.comp_friendly else ['-c_in','r1']
+                "legs": ['c_in', 'r1'] if not self.comp_friendly else ['-c_in', 'r1']
             }
             nodes['U_c_out'] = {
                 "tensor": Tensor(self.r2, self.out_channels),
@@ -297,7 +297,7 @@ class AirConv3D(nn.Module):
             nodes['U_k_w'] = {
                 'tensor': Tensor(self.r2, self.kernel_size, self.r3),
                 'shape': (self.r2, self.kernel_size, self.r3),
-                'legs': ['r2', 'k_w', 'r3']if not self.comp_friendly else ['r2', '-k_w', 'r3']
+                'legs': ['r2', 'k_w', 'r3'] if not self.comp_friendly else ['r2', '-k_w', 'r3']
             }
             nodes['U_k_d'] = {
                 'tensor': Tensor(self.r3, self.kernel_size, self.r4),
@@ -309,7 +309,7 @@ class AirConv3D(nn.Module):
             nodes['U_c_in'] = {
                 "tensor": Tensor(self.in_channels, self.r1),
                 "shape": (self.in_channels, self.r1),
-                "legs": ['c_in', 'r1'] if not self.comp_friendly else ['-c_in','r1']
+                "legs": ['c_in', 'r1'] if not self.comp_friendly else ['-c_in', 'r1']
             }
             nodes['U_c_out'] = {
                 "tensor": Tensor(self.r4, self.out_channels),
@@ -383,7 +383,6 @@ class AirConv3D(nn.Module):
             kernel_size=self.kernel_size
         )
 
-
     def _get_tensor_network_size(self) -> float:
         """
         Get the number of parameters involved in the kernel decomposition/tensor network,
@@ -439,8 +438,12 @@ class AirConv3D(nn.Module):
         return output
 
 
+###################
+# Low-rank blocks #
+###################
+
 # Double convolution block for low rank layers
-class AirDoubleConv(nn.Module):
+class AirDoubleConvBlock(nn.Module):
 
     def __init__(
             self,
@@ -449,65 +452,139 @@ class AirDoubleConv(nn.Module):
             in_channels: int,
             out_channels: int,
             num_groups=8,
-            strides=(2, 1),
-            activation=nn.LeakyReLU(inplace=True),
-            double_conv_par=None,
-            comp_friendly:bool = True,
-            __name__='low_rank_double_conv',
+            stride=2,
+            activation=nn.LeakyReLU,
+            conv: nn.Module = AirConv3D,
+            conv_params=None,
+            comp_friendly: bool = True,
+            __name__='low_rank_double_conv_block',
     ):
         super().__init__()
         self.__name__ = __name__
-        self.comp_friendly = comp_friendly
 
         # Initialize convolution parameters
-        double_conv_par = double_conv_par if double_conv_par else {}
+        conv_params = conv_params if conv_params else {}
 
         # Set parameters (if not given!)
-        double_conv_par.setdefault('kernel_size', 3)
-        double_conv_par.setdefault('padding', 1)
-        double_conv_par.setdefault('comp_friendly', self.comp_friendly)
+        conv_params.setdefault('kernel_size', 3)
+        conv_params.setdefault('padding', 1)
 
         # Define inner block architecture
         self.block = nn.Sequential(
 
             # Lightweight convolutional layer
-            AirConv3D(
+            conv(
                 compression=compression,
                 in_channels=in_channels,
                 out_channels=out_channels,
-                stride=strides[0],
+                stride=stride,
                 tensor_net_type=tensor_net_type,
-                #comp_friendly=comp_friendly,
-                **double_conv_par
+                comp_friendly=comp_friendly,
+                **conv_params
             ),
 
             # Normalization layer (default minibatch of 8 instances)
             nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
 
             # Activation layer
-            activation,
+            activation(inplace=True),
 
             # Lightweight convolutional layer
-            AirConv3D(
+            conv(
                 compression=compression,
                 in_channels=out_channels,
                 out_channels=out_channels,
-                stride=strides[1],
+                stride=1,
                 tensor_net_type=tensor_net_type,
-                #comp_friendly=comp_friendly,
-                **double_conv_par
+                comp_friendly=comp_friendly,
+                **conv_params
             ),
 
             # Normalization layer (default minibatch of 8 instances)
             nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
 
             # Activation layer
-            activation
+            activation(inplace=True)
         )
 
     # Forward function (backward propagation is added automatically)
     def forward(self, input):
         return self.block(input)
+
+
+class AirResBlock(nn.Module):
+
+    def __init__(
+            self,
+            compression: int,
+            tensor_net_type: str,
+            in_channels: int,
+            out_channels: int,
+            stride: int = 2,
+            num_groups=8,
+            activation=nn.LeakyReLU,
+            comp_friendly: bool = True,
+            conv: nn.Module = AirConv3D,
+            conv_params: dict = None,
+            name: str = 'low_rank_res_block',
+    ):
+        super().__init__()
+        self.__name__ = name
+
+        # Initialize convolution parameters, set defaults
+        conv_params = {} if conv_params is None else conv_params
+        conv_params.setdefault("kernel_size", 3)
+        conv_params.setdefault("padding", 1)
+
+        self.conv1 = conv(
+            tensor_net_type=tensor_net_type,
+            compression=compression,
+            comp_friendly=comp_friendly,
+            in_channels=in_channels,
+            out_channels=out_channels,
+            stride=stride,
+            **conv_params
+        )
+        self.norm1 = nn.GroupNorm(num_groups, out_channels)
+        self.conv2 = conv(
+            tensor_net_type=tensor_net_type,
+            compression=compression,
+            comp_friendly=comp_friendly,
+            in_channels=out_channels,
+            out_channels=out_channels,
+        )
+        self.norm2 = nn.GroupNorm(num_groups, out_channels)
+        self.act = activation(inplace=True)
+
+        if stride != 1 or in_channels != out_channels:
+            self.shortcut = nn.Conv3d(
+                in_channels,
+                out_channels,
+                kernel_size=1,
+                stride=stride,
+                bias=False
+            )
+        else:
+            self.shortcut = nn.Identity()
+
+    def forward(self, x):
+
+        # Prepare to propagate input
+        shortcut = self.shortcut(x)
+
+        # Go through two convolutions
+        out = self.conv1(x)
+        out = self.norm1(out)
+        out = self.act(out)
+        out = self.conv2(out)
+        out = self.norm2(out)
+
+        # Append the propagated input
+        out += shortcut
+
+        out = self.act(out)
+
+        return out
 
 
 if __name__ == '__main__':
@@ -530,36 +607,41 @@ if __name__ == '__main__':
     # Test image
     image = torch.rand(1, in_channels, dim, dim, dim)
     image = image.to(device)
+    test_params = {
+        'in_channels': 4,
+        'out_channels': 32,
+        'kernel_size': 3,
+        'stride': 1,
+        'padding': 1
+    }
+    air_test_params = copy.deepcopy(test_params)
+    air_test_params.update(
+        {
+            'compression': 5,
+            'comp_friendly': True,
+            'bias': False}
+    )
 
     # Classic convolutional layer
-    layer_classic = nn.Conv3d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_dim, padding=1)
+    layer_classic = nn.Conv3d(**test_params)
     layer_classic.to(device)
 
     # Low-rank layers
     compression = 150
 
     # Computational demand
-    comp_friendly=False
+    comp_friendly = False
 
     # Canonical layer
-    layer_canon = AirConv3D(in_channels=in_channels, out_channels=out_channels,
-                            compression=compression,
-                            kernel_size=kernel_dim, padding=1, tensor_net_type='cpd',
-                            comp_friendly=comp_friendly)
+    layer_canon = AirConv3D(tensor_net_type='cp', **air_test_params)
     layer_canon.to(device)
 
     # Tucker layer
-    layer_tucker = AirConv3D(in_channels=in_channels, out_channels=out_channels,
-                              compression=compression,
-                              kernel_size=kernel_dim, padding=1, tensor_net_type='tucker',
-                             comp_friendly=comp_friendly)
+    layer_tucker = AirConv3D(tensor_net_type='tucker', **air_test_params)
     layer_tucker.to(device)
 
     # TT layer
-    layer_tt = AirConv3D(in_channels=in_channels, out_channels=out_channels,
-                         compression=compression,
-                         kernel_size=kernel_dim, padding=1, tensor_net_type='train',
-                         comp_friendly=comp_friendly)
+    layer_tt = AirConv3D(tensor_net_type='tt', **air_test_params)
     layer_tt.to(device)
 
     # Sample output
@@ -572,13 +654,10 @@ if __name__ == '__main__':
     assert tt_output.size() == classic_output.size(), "Something went wrong with TT format, output shapes don't match!"
 
     # Double conv test
-    double_conv_classic = DoubleConv(in_channels=in_channels, out_channels=out_channels)
+    double_conv_classic = DoubleConvBlock(in_channels=in_channels, out_channels=out_channels)
     double_conv_classic_output = double_conv_classic(image)
-    double_conv_cpd = AirDoubleConv(compression=compression, tensor_net_type='cpd', in_channels=in_channels,
-                                    out_channels=out_channels, num_groups=8)
+    double_conv_cpd = AirResBlock(compression=compression, tensor_net_type='cpd', in_channels=in_channels,
+                                  out_channels=out_channels, num_groups=8)
     double_conv_cpd_output = double_conv_cpd(image)
-    """
+
     assert double_conv_cpd_output.size() == double_conv_classic_output.size(), "Something went wrong with double conv CPD, output shapes don't match!"
-    """
-
-
