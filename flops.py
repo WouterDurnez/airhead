@@ -14,9 +14,9 @@ from pprint import PrettyPrinter
 import numpy as np
 from ptflops import get_model_complexity_info
 
-from layers.air_conv import count_lr_conv3d, AirConv3D, AirDoubleConv
+from layers.air_conv import count_lr_conv3d, AirConv3D, AirDoubleConvBlock
 from models.air_unet import AirUNet
-from models.baseline_unet import UNet
+from models.base_unet import UNet
 from utils.helper import log, hi
 import utils.helper as hlp
 
@@ -66,7 +66,7 @@ if __name__ == '__main__':
             # Build tensorized U-Net
             model = AirUNet(compression=compression,
                             tensor_net_type=tensor_net_type,
-                            double_conv=AirDoubleConv,
+                            core_block=AirDoubleConvBlock,
                             in_channels=4,
                             out_channels=3,
                             comp_friendly=True)
