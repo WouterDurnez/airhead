@@ -103,7 +103,6 @@ class UNet(nn.Module):
             self.final_act = nn.Sigmoid()
 
     # Forward propagation
-    @time_it
     def forward(self, input):
         """
         Combine layers into encoder-decoder structure, adding skip connections
