@@ -49,3 +49,6 @@ venv.bak/
 /logs
 /jobscripts
 /evaluation/_old/
+
+# Interim data
+*.npy
