@@ -7,7 +7,7 @@
 """
 Lightning wrapper for model, to facilitate training
 """
-
+import numpy as np
 import torch.nn.functional as F
 from torch import nn
 from torch import optim
@@ -148,7 +148,7 @@ class UNetLightning(LightningModule):
                 metric_value = metric_value.item()
             self.log(metric_name, metric_value, prog_bar=True)
 
-            # Log using Tensorboard logger TODO: Check if this is necessary, and how this compares to self.log
+            # Log using Tensorboard logger
             self.logger.experiment.add_scalar(f"{metric_name}/train", metric_value, self.current_epoch)
 
     # Validation step
@@ -177,11 +177,18 @@ class UNetLightning(LightningModule):
             # Average metric over outputs within epoch
             metric_total = 0.0
             for output in outputs:
-                metric_total += output[metric_name]
+
+                # Unpack value in tensor
+                if hasattr(output[metric_name],'item'):
+                    output[metric_name] = output[metric_name].item()
+
+                # Check for NaN and Inf values and skip those
+                if not np.isnan(output[metric_name]) and not np.isinf(output[metric_name]):
+                    metric_total += output[metric_name]
+
+            # Take average (excluding NaN and Inf)
             metric_value = metric_total / len(outputs)
 
-            if hasattr(metric_value, "item"):
-                metric_value = metric_value.item()
             self.log(metric_name, metric_value, prog_bar=True)
 
             # Log using Tensorboard logger
