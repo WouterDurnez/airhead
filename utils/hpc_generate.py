@@ -36,7 +36,7 @@ if __name__ == '__main__':
             f.write(f'#!/bin/bash\n'
                     f'\n#FOLD {fold}\n')
 
-            for comp in (2, 5, 10, 20, 35, 50, 75, 100):
+            for comp in (2, 5, 10, 20):
 
                 f.write(f'#COMPRESSION {comp}\n')
 
