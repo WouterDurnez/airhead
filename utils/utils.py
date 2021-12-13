@@ -8,10 +8,11 @@
 Various utilities
 """
 import inspect
-import os
-from os.path import join
-import sys
 import math
+import os
+import sys
+from os.path import join
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -168,8 +169,8 @@ def get_tuning_par(compression: int, tensor_net_type: str, in_channels: int, out
         solutions = solve((max_params / (
                 ((in_channels ** 2) / S) +
                 ((out_channels ** 2) / S) +
-                ((in_channels / S) * (out_channels / S) * 3 * 3 * 3)
-        ))-compression,S)
+                ((in_channels / S) * (out_channels / S) * kernel_size ** 3)
+        )) - compression, S)
 
         # Check for appropriate S values
         evaluated_solutions = []
@@ -188,13 +189,21 @@ def get_tuning_par(compression: int, tensor_net_type: str, in_channels: int, out
     if tensor_net_type in ['tt', 'tensor-train', 'train']:
         '''
         tensor train params:
-        r * (in_channels + r*(3+3+3) + out_channels)
+        (in_channels * in_channels/S) + 
+        (in_channels/S * 3 * kernel_size) +
+        (3*3*kernel_size) +
+        (out_channels/S * 3 * kernel_size) +
+        (out_channels * out_channels/S)
 
         compression = max_params / tt_params     
         '''
-        r = Symbol('r', real=True, positive=True)
+        S = Symbol('S', real=True, positive=True)
         solutions = solve(max_params /
-                          (r * (in_channels + 3 * (3 * r) + out_channels)) - compression, r)
+                          ((in_channels * (in_channels / S)) +
+                           (in_channels / S * kernel_size ** 2) +
+                           (kernel_size ** 3) +
+                           (out_channels / S * kernel_size ** 2) +
+                           (out_channels * out_channels / S)) - compression, S)
 
         # Check for appropriate S values
         evaluated_solutions = []
@@ -209,7 +218,6 @@ def get_tuning_par(compression: int, tensor_net_type: str, in_channels: int, out
 
 def get_network_size(tuning_param: float, tensor_net_type: str, in_channels: int, out_channels: int,
                      kernel_size: int = 3) -> float:
-
     # Make sure the right type of tensor network was passed
     assert tensor_net_type in TENSOR_NET_TYPES, f"Choose a valid tensor network {TENSOR_NET_TYPES}"
 
@@ -237,13 +245,13 @@ def get_network_size(tuning_param: float, tensor_net_type: str, in_channels: int
         (C_in**2/S)        + (C_out**/S)       + (C_in/S * C_out/S * k_h * k_w * k_d)
         = input node shape + output node shape + central node shape
         '''
-        in_param = round(in_channels/tuning_param)
-        out_param = round(out_channels/tuning_param)
-        in_param_squared = round(in_channels**2/ tuning_param)
-        out_param_squared = round(out_channels**2/ tuning_param)
+        in_param = round(in_channels / tuning_param)
+        out_param = round(out_channels / tuning_param)
+        in_param_squared = round(in_channels ** 2 / tuning_param)
+        out_param_squared = round(out_channels ** 2 / tuning_param)
 
         return (
-            in_param_squared + out_param_squared + (in_param * out_param * 3 * 3 * 3)
+                in_param_squared + out_param_squared + (in_param * out_param * kernel_size ** 3)
         )
 
     ################
@@ -253,9 +261,23 @@ def get_network_size(tuning_param: float, tensor_net_type: str, in_channels: int
     elif tensor_net_type in ['tt', 'tensor-train', 'train']:
         '''
         tensor train params:
-        r * (in_channels + r*(3+3+3) + out_channels)
+        in_channels**2/S + 
+        in_channels/S * kernel_size**2 +
+        kernel_size**3 +
+        out_channels/S * kernel_size**2 +
+        out_channels**2/S + 
         '''
-        return tuning_param * (in_channels + tuning_param * 9 + out_channels)
+
+        in_param = round(in_channels / tuning_param)
+        out_param = round(out_channels / tuning_param)
+        in_param_squared = round(in_channels ** 2 / tuning_param)
+        out_param_squared = round(out_channels ** 2 / tuning_param)
+
+        return in_param_squared + \
+               out_param_squared + \
+               in_param * kernel_size ** 2 + \
+               out_param * kernel_size ** 2 + \
+               kernel_size ** 3
 
 
 if __name__ == '__main__':
@@ -282,20 +304,19 @@ if __name__ == '__main__':
     for comp in compression_rates:
         theoretical_params.append(max_param / comp)
         tuning_cpd.append(get_tuning_par(compression=comp, tensor_net_type='cpd', in_channels=in_channels,
-                                         out_channels=out_channels, kernel_size=3))
+                                         out_channels=out_channels, kernel_size=kernel_size))
         cpd_params.append(get_network_size(tuning_param=tuning_cpd[-1], tensor_net_type='cpd', in_channels=in_channels,
-                                           out_channels=out_channels, kernel_size=3))
+                                           out_channels=out_channels, kernel_size=kernel_size))
 
         tuning_tucker.append(get_tuning_par(compression=comp, tensor_net_type='tucker', in_channels=in_channels,
-                                            out_channels=out_channels, kernel_size=3))
+                                            out_channels=out_channels, kernel_size=kernel_size))
         tucker_params.append(
             get_network_size(tuning_param=tuning_tucker[-1], tensor_net_type='tucker', in_channels=in_channels,
-                             out_channels=out_channels, kernel_size=3))
+                             out_channels=out_channels, kernel_size=kernel_size))
         tuning_tt.append(get_tuning_par(compression=comp, tensor_net_type='tt', in_channels=in_channels,
-                                        out_channels=out_channels, kernel_size=3))
+                                        out_channels=out_channels, kernel_size=kernel_size))
         tt_params.append(get_network_size(tuning_param=tuning_tt[-1], tensor_net_type='tt', in_channels=in_channels,
-                                          out_channels=out_channels, kernel_size=3))
-
+                                          out_channels=out_channels, kernel_size=kernel_size))
 
     # Create data frame
     df = pd.DataFrame({
