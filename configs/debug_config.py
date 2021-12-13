@@ -43,8 +43,8 @@ GENERAL = {
         "scheduler_config": {
             "interval": "step"},
         "scheduler_params": {
-            "warmup_steps": 100,
-            "total_steps": 500,
+            "warmup_steps": 20,
+            "total_steps": 180,
         },
         "inference": test_inference,
         "inference_params": {
@@ -64,7 +64,7 @@ GENERAL = {
         "cache_rate": 1.0,
     },
     "training": {
-        "max_steps": 600,  # -> sys.maxsize (which works for any #steps)
+        "max_epochs": 1,
         "gpus": 0,
         "num_nodes": 1,
         "strategy": DDPPlugin(find_unused_parameters=False),
@@ -77,6 +77,7 @@ GENERAL = {
         "check_val_every_n_epoch": 25,
         "limit_train_batches":1,
         "limit_val_batches":2,
+        "limit_test_batches":1,
     },
     "logs": {
         "log_dir": "../logs"},

@@ -28,13 +28,17 @@ pp = PrettyPrinter()
 
 if __name__ == '__main__':
 
+    # Debug mode
+    debug = True
+
     # Get arguments
-    debug_mode = True
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--type', help='Network type (base, cp, tt, tucker)')
     parser.add_argument('--comp', help='Compression rate (int)')
     parser.add_argument('--fold', help='Fold index (0-4)')
+    parser.add_argument('--kernel', help='Kernel size for core block convolutions (default: 3)')
+    parser.add_argument('--debug', action='store_true', help='Use debug config')
 
     args = parser.parse_args()
 
@@ -47,14 +51,14 @@ if __name__ == '__main__':
     if net_type == 'base':
 
         # Use base configuration
-        config = CONFIG_BASE if not debug_mode else DEBUG_CONFIG_BASE
+        config = CONFIG_BASE if not debug else DEBUG_CONFIG_BASE
         compression = version = 1
 
     else:
 
         # If we use a tensorized model, compression rate must be given
         assert args.comp is not None, "Please enter a valid compression rate! (--COMP)"
-        config = CONFIG_AIR if not debug_mode else DEBUG_CONFIG_AIR
+        config = CONFIG_AIR if not debug else DEBUG_CONFIG_AIR
 
         # Extra parameters for AirUNet
         config['model']['network_params']['compression'] = version = int(args.comp)
@@ -90,7 +94,7 @@ if __name__ == '__main__':
 
     # Initialize trainer
     log("Initializing trainer.")
-    trainer = Trainer(**config['training'], logger=tb_logger)
+    trainer = Trainer(**config['training'], logger=tb_logger, num_sanity_val_steps=0)
 
     # Train
     log("Commencing training.")
@@ -103,7 +107,7 @@ if __name__ == '__main__':
     # Test
     log("Evaluating model.")
     trainer.test(model=model,
-                 datamodule=brats)
+                 dataloaders=brats.val_dataloader())
     results = model.test_results
 
     # Save test results
