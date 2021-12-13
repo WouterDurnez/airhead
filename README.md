@@ -32,8 +32,7 @@ Supervisor: [Pooya Ashtari](https://www.kuleuven.be/wieiswie/nl/person/00129604)
 
 Implementations of low-rank convolutional layers.
 
-* `air_conv.py` -- Theoretical implementation, where the input tensor is unfolded and contracted with the weight tensor network.
-* `air_conv_alt.py` -- Practical implementation that removes the need for input tensor unfolding.
+* `air_conv.py` -- Implementation of low-rank principle, for various tensor network formats. Includes `comp_friendly` parameter for optimized training (WARNING: don't count FLOPS using optimized computation!)
 
 #### 3. [models](models/)
 
