@@ -13,10 +13,10 @@ Isensee, F., Jaeger, P. F., Full, P. M., Vollmuth, P., & Maier-Hein, K. H. (2020
 import torch
 import torch.nn as nn
 from torch import cat
-from utils.helper import *
-import numpy as np
+
 from layers.base_layers import DoubleConvBlock, Upsample, ResBlock
-from utils.helper import time_it
+from utils.helper import *
+
 
 # Full 3D-UNet architecture
 class UNet(nn.Module):
@@ -25,10 +25,10 @@ class UNet(nn.Module):
             in_channels,
             out_channels,
             widths=(32, 64, 128, 256, 320),
-            activation:nn.Module=nn.LeakyReLU,
-            core_block:nn.Module=DoubleConvBlock,
+            activation: nn.Module = nn.LeakyReLU,
+            core_block: nn.Module = DoubleConvBlock,
             core_block_conv_params: dict = None,
-            downsample = 'strided_convolution',
+            downsample='strided_convolution',
             up_par=None,
             head=True
     ):
@@ -86,20 +86,25 @@ class UNet(nn.Module):
         5 segments composed of transposed convolutions (upsampling) and double convolution blocks
         """
         self.up_1 = Upsample(self.widths[4], self.widths[4], up_par=up_par)
-        self.dec_1 = core_block(2 * self.widths[4], self.widths[3], stride=1, activation=activation, conv_params=core_block_conv_params)  # double the filters due to concatenation
+        self.dec_1 = core_block(2 * self.widths[4], self.widths[3], stride=1, activation=activation,
+                                conv_params=core_block_conv_params)  # double the filters due to concatenation
         self.up_2 = Upsample(self.widths[3], self.widths[3], up_par=up_par)
-        self.dec_2 = core_block(2 * self.widths[3], self.widths[2], stride=1, activation=activation, conv_params=core_block_conv_params)
+        self.dec_2 = core_block(2 * self.widths[3], self.widths[2], stride=1, activation=activation,
+                                conv_params=core_block_conv_params)
         self.up_3 = Upsample(self.widths[2], self.widths[2], up_par=up_par)
-        self.dec_3 = core_block(2 * self.widths[2], self.widths[1], stride=1, activation=activation, conv_params=core_block_conv_params)
+        self.dec_3 = core_block(2 * self.widths[2], self.widths[1], stride=1, activation=activation,
+                                conv_params=core_block_conv_params)
         self.up_4 = Upsample(self.widths[1], self.widths[1], up_par=up_par)
-        self.dec_4 = core_block(2 * self.widths[1], self.widths[0], stride=1, activation=activation, conv_params=core_block_conv_params)
+        self.dec_4 = core_block(2 * self.widths[1], self.widths[0], stride=1, activation=activation,
+                                conv_params=core_block_conv_params)
         self.up_5 = Upsample(self.widths[0], self.widths[0], up_par=up_par)
-        self.dec_5 = core_block(2 * self.widths[0], self.widths[0], stride=1, activation=activation, conv_params=core_block_conv_params)
+        self.dec_5 = core_block(2 * self.widths[0], self.widths[0], stride=1, activation=activation,
+                                conv_params=core_block_conv_params)
 
         # Output
         self.final_conv = nn.Conv3d(in_channels=self.widths[0], out_channels=out_channels, kernel_size=1)
         if self.head:
-            #self.final_act = nn.Softmax(dim=1)
+            # self.final_act = nn.Softmax(dim=1)
             self.final_act = nn.Sigmoid()
 
     # Forward propagation
@@ -143,7 +148,7 @@ class UNet(nn.Module):
         if self.head:
             output = self.final_act(final_conv)
         else:
-            output=final_conv
+            output = final_conv
 
         return output
 
@@ -163,11 +168,10 @@ if __name__ == '__main__':
 
     # Initialize model
     base_model = UNet(in_channels=4, out_channels=3, head=False)
-    res_model = UNet(in_channels=4, out_channels=3, head=False,core_block=ResBlock)
+    res_model = UNet(in_channels=4, out_channels=3, head=False, core_block=DoubleConvBlock)
 
     # Process example input
     out_base = base_model(x)
     out_res = res_model(x)
     log(f'Output size (base): {out_base.size()}')
     log(f'Output size (res): {out_res.size()}')
-
