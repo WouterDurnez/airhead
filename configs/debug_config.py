@@ -75,6 +75,8 @@ GENERAL = {
             # PrintTableMetricsCallback(),
         ],
         "check_val_every_n_epoch": 25,
+        "limit_train_batches":1,
+        "limit_val_batches":2,
     },
     "logs": {
         "log_dir": "../logs"},

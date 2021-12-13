@@ -17,7 +17,9 @@ from medset.brats import BraTSDataModule
 from pytorch_lightning import Trainer
 from pytorch_lightning.loggers import TensorBoardLogger
 
-from configs.configs import CONFIG_AIR, CONFIG_BASE
+from configs.live_config import CONFIG_AIR, CONFIG_BASE
+from configs.debug_config import CONFIG_AIR as DEBUG_CONFIG_AIR
+from configs.debug_config import CONFIG_BASE as DEBUG_CONFIG_BASE
 from training.lightning import UNetLightning
 from utils import helper as hlp
 from utils.helper import log, set_dir
@@ -27,6 +29,7 @@ pp = PrettyPrinter()
 if __name__ == '__main__':
 
     # Get arguments
+    debug_mode = True
     parser = argparse.ArgumentParser()
 
     parser.add_argument('--type', help='Network type (base, cp, tt, tucker)')
@@ -44,14 +47,14 @@ if __name__ == '__main__':
     if net_type == 'base':
 
         # Use base configuration
-        config = CONFIG_BASE
+        config = CONFIG_BASE if not debug_mode else DEBUG_CONFIG_BASE
         compression = version = 1
 
     else:
 
         # If we use a tensorized model, compression rate must be given
         assert args.comp is not None, "Please enter a valid compression rate! (--COMP)"
-        config = CONFIG_AIR
+        config = CONFIG_AIR if not debug_mode else DEBUG_CONFIG_AIR
 
         # Extra parameters for AirUNet
         config['model']['network_params']['compression'] = version = int(args.comp)
@@ -99,7 +102,8 @@ if __name__ == '__main__':
 
     # Test
     log("Evaluating model.")
-    trainer.test()
+    trainer.test(model=model,
+                 datamodule=brats)
     results = model.test_results
 
     # Save test results
