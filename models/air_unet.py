@@ -181,7 +181,7 @@ if __name__ == '__main__':
     lr_unet = AirUNet(compression=10, tensor_net_type='cp', comp_friendly=True,
                       in_channels=4, out_channels=3, head=False)
 
-    lr_unet_res = AirUNet(core_block=AirResBlock, compression=10, tensor_net_type='cp', comp_friendly=True,
+    lr_unet_res = AirUNet(core_block=AirResBlock, compression=20, tensor_net_type='tt', comp_friendly=True,
                       in_channels=4, out_channels=3, head=False)
     # Process example input
     out_lr = lr_unet(x)

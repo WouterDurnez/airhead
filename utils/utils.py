@@ -245,10 +245,10 @@ def get_network_size(tuning_param: float, tensor_net_type: str, in_channels: int
         (C_in**2/S)        + (C_out**/S)       + (C_in/S * C_out/S * k_h * k_w * k_d)
         = input node shape + output node shape + central node shape
         '''
-        in_param = round(in_channels / tuning_param)
-        out_param = round(out_channels / tuning_param)
-        in_param_squared = round(in_channels ** 2 / tuning_param)
-        out_param_squared = round(out_channels ** 2 / tuning_param)
+        in_param = round(in_channels / tuning_param) if round(in_channels / tuning_param) > 0 else 1
+        out_param = round(out_channels / tuning_param) if round(out_channels / tuning_param) > 0 else 1
+        in_param_squared = in_param * in_channels
+        out_param_squared = out_param * out_channels
 
         return (
                 in_param_squared + out_param_squared + (in_param * out_param * kernel_size ** 3)
@@ -268,10 +268,10 @@ def get_network_size(tuning_param: float, tensor_net_type: str, in_channels: int
         out_channels**2/S + 
         '''
 
-        in_param = round(in_channels / tuning_param)
-        out_param = round(out_channels / tuning_param)
-        in_param_squared = round(in_channels ** 2 / tuning_param)
-        out_param_squared = round(out_channels ** 2 / tuning_param)
+        in_param = round(in_channels / tuning_param) if round(in_channels / tuning_param) > 0 else 1
+        out_param = round(out_channels / tuning_param) if round(out_channels / tuning_param) > 0 else 1
+        in_param_squared = in_param * in_channels
+        out_param_squared = out_param * out_channels
 
         return in_param_squared + \
                out_param_squared + \

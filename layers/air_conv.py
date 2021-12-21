@@ -164,7 +164,7 @@ class AirConv3D(nn.Module):
                          'k_h', 'k_w', 'k_d']
             }
 
-        log(f'Creating CPD layer [comp={self.compression}, '
+        log(f'Creating CP layer [comp={self.compression}, '
             f'(Cin,Cout)=({self.in_channels},{self.out_channels}), '
             f'kernel={self.kernel_size}, '
             f'comp_friendly = {self.comp_friendly}].', verbosity=3, color='magenta')
@@ -180,7 +180,7 @@ class AirConv3D(nn.Module):
             self.rank = self._get_tuning_par()
 
             """
-            For the CPD format, we need 5 factor matrices: 
+            For the CP format, we need 5 factor matrices: 
              * 1 for each of the kernel dimensions: U_k_h, U_k_w, U_kd,
              * 1 for the input channels, 1 for the output channels: U_c_in and U_c_out
              
@@ -280,8 +280,8 @@ class AirConv3D(nn.Module):
             self.S = self._get_tuning_par()
 
             # Set bond dimensions, depending on type
-            self.r1 = round(self.in_channels/self.S)
-            self.r4 = round(self.out_channels/self.S)
+            self.r1 = round(self.in_channels/self.S) if round(self.in_channels/self.S) > 0 else 1
+            self.r4 = round(self.out_channels/self.S) if round(self.out_channels/self.S) > 0 else 1
             self.r2 = self.r3 = self.kernel_size
 
             # First kernel factor matrices (U_kh, U_kd, U_kw)
@@ -613,7 +613,7 @@ if __name__ == '__main__':
     air_test_params = copy.deepcopy(test_params)
     air_test_params.update(
         {
-            'compression': 5,
+            'compression': 20,
             'comp_friendly': True,
             'bias': False}
     )
@@ -621,9 +621,6 @@ if __name__ == '__main__':
     # Classic convolutional layer
     layer_classic = nn.Conv3d(**test_params)
     layer_classic.to(device)
-
-    # Low-rank layers
-    compression = 150
 
     # Computational demand
     comp_friendly = False
@@ -652,8 +649,9 @@ if __name__ == '__main__':
     # Double conv test
     double_conv_classic = DoubleConvBlock(in_channels=in_channels, out_channels=out_channels)
     double_conv_classic_output = double_conv_classic(image)
-    double_conv_cpd = AirResBlock(compression=compression, tensor_net_type='cpd', in_channels=in_channels,
-                                  out_channels=out_channels, num_groups=8)
+    double_conv_cpd = AirResBlock(tensor_net_type='cpd', compression=20,
+                                  in_channels=in_channels, out_channels=out_channels,
+                                  num_groups=8)
     double_conv_cpd_output = double_conv_cpd(image)
 
     assert double_conv_cpd_output.size() == double_conv_classic_output.size(), "Something went wrong with double conv CPD, output shapes don't match!"
