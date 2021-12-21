@@ -5,13 +5,12 @@
 #
 
 """
-Configuration for HPC training
+DEBUG Configuration for HPC training
 """
 
 from copy import deepcopy
 
-from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
-from pytorch_lightning.plugins import DDPPlugin
+from pytorch_lightning.callbacks import LearningRateMonitor
 from torch.optim import AdamW
 
 from layers.air_conv import AirResBlock
@@ -67,7 +66,7 @@ GENERAL = {
         "max_epochs": 1,
         "gpus": 0,
         "num_nodes": 1,
-        "strategy": DDPPlugin(find_unused_parameters=False),
+        # "strategy": DDPPlugin(find_unused_parameters=False),
         "deterministic": True,
         "callbacks": [
             LearningRateMonitor(logging_interval="step"),
@@ -75,9 +74,9 @@ GENERAL = {
             # PrintTableMetricsCallback(),
         ],
         "check_val_every_n_epoch": 25,
-        "limit_train_batches":1,
-        "limit_val_batches":2,
-        "limit_test_batches":1,
+        "limit_train_batches": 1,
+        "limit_val_batches": 0,
+        "limit_test_batches": 3,
     },
     "logs": {
         "log_dir": "../logs"},
@@ -89,7 +88,7 @@ BASE_MODEL = {
         "core_block": ResBlock,
         "in_channels": 4,
         "out_channels": 3,
-        "widths": (32, 64, 128, 256, 512),
+        #"widths": (32, 64, 128, 256, 512),
         "head": False,
     },
 }
@@ -101,7 +100,7 @@ AIR_MODEL = {
             "comp_friendly": True},
         "in_channels": 4,
         "out_channels": 3,
-        "widths": (32, 64, 128, 256, 512),
+        #"widths": (32, 64, 128, 256, 512),
         "head": False,
     },
 }

@@ -86,7 +86,7 @@ BASE_MODEL = {
         "core_block": ResBlock,
         "in_channels": 4,
         "out_channels": 3,
-        "widths": (32, 64, 128, 256, 512),
+        #"widths": (32, 64, 128, 256, 512),
         "head": False,
     },
 }
@@ -98,7 +98,7 @@ AIR_MODEL = {
             "comp_friendly": True},
         "in_channels": 4,
         "out_channels": 3,
-        "widths": (32, 64, 128, 256, 512),
+        #"widths": (32, 64, 128, 256, 512),
         "head": False,
     },
 }
