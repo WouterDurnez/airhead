@@ -14,7 +14,8 @@ from pprint import PrettyPrinter
 import numpy as np
 from ptflops import get_model_complexity_info
 
-from layers.air_conv import count_lr_conv3d, AirConv3D, AirDoubleConvBlock
+from layers.air_conv import count_lr_conv3d, AirConv3D, AirDoubleConvBlock, AirResBlock
+from layers.base_layers import ResBlock
 from models.air_unet import AirUNet
 from models.base_unet import UNet
 from utils.helper import log, hi
@@ -39,7 +40,9 @@ if __name__ == '__main__':
     log('Counting baseline network.', color='blue', verbosity=1)
 
     # Build baseline U-Net
-    baseline_model = UNet(in_channels=4, out_channels=3)
+    baseline_model = UNet(in_channels=4, out_channels=3,
+                          widths=(32, 64, 128, 256, 512),
+                          core_block=ResBlock)
 
     # Get macs and parameters
     macs, params = get_model_complexity_info(model=baseline_model, input_res=(4, 128, 128, 128), as_strings=False,
@@ -60,16 +63,18 @@ if __name__ == '__main__':
 
         info[tensor_net_type] = {}
 
-        for compression in (2, 5, 10, 20, 35, 50, 75, 100):
+        for compression in (2, 5, 10, 20,):
             log(f'Counting tensorized network [{tensor_net_type}-{compression}].', verbosity=1, color='blue')
 
             # Build tensorized U-Net
             model = AirUNet(compression=compression,
                             tensor_net_type=tensor_net_type,
-                            core_block=AirDoubleConvBlock,
+                            comp_friendly=True,
+                            widths=(32, 64, 128, 256, 512),
+                            core_block=AirResBlock,
                             in_channels=4,
                             out_channels=3,
-                            comp_friendly=True)
+                            )
 
             # Get macs and parameters (using custom hook)
             macs, params = get_model_complexity_info(model=model, input_res=(4, 128, 128, 128), as_strings=False,
