@@ -208,7 +208,7 @@ class UNetLightning(LightningModule):
 
         # Calculate metrics
         id = id[0] if len(id) == 1 else id
-        #id = torch.tensor(int(id[-3:]), dtype=torch.int32)
+        id = int(id[-3:])
 
         # Output dict with duration of inference
         output = {"id": id}
@@ -237,12 +237,11 @@ class UNetLightning(LightningModule):
         # Loop over metrics
         for metric_name in metrics_dict:
 
-            # Temporarily buffer metrics here
+            """ We'll store all these metric values in a list, 
+            so we can turn it into a single tensor after.
+            This is to accommodate `self.all_gather()`. """
             temp = []
-
-            # Average metric over outputs within epoch
             for output in outputs:
-
                 temp.append(output[metric_name])
 
             # Store in new dict
