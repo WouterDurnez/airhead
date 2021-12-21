@@ -69,7 +69,7 @@ if __name__ == '__main__':
             # Build tensorized U-Net
             model = AirUNet(compression=compression,
                             tensor_net_type=tensor_net_type,
-                            comp_friendly=True,
+                            comp_friendly=False,
                             widths=(32, 64, 128, 256, 512),
                             core_block=AirResBlock,
                             in_channels=4,
