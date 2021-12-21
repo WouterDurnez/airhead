@@ -237,7 +237,7 @@ class UNetLightning(LightningModule):
         # Loop over metrics
         for metric_name in metrics_dict:
 
-            # Temporary buffer metrics here
+            # Temporarily buffer metrics here
             temp = []
 
             # Average metric over outputs within epoch
