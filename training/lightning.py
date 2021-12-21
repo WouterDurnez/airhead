@@ -8,6 +8,7 @@
 Lightning wrapper for model, to facilitate training
 """
 import numpy as np
+import torch
 import torch.nn.functional as F
 from torch import nn
 from torch import optim
@@ -198,16 +199,6 @@ class UNetLightning(LightningModule):
     def test_step(self, batch, batch_idx):
 
         # Get new input and predict, then calculate loss
-        """x, y = batch["input"], batch["target"]
-        y_hat = self.inference(x, self, **self.inference_params)
-
-        # Calculate metrics
-        output = {}
-        for m, pars in zip(self.metrics, self.metrics_params):
-            output[f"test_{m.__name__}"] = m(y_hat, y, **pars)
-        return output"""
-
-        # Get new input and predict, then calculate loss
         x, y, id = batch["input"], batch["target"], batch["id"]
 
         # Infer and time inference
@@ -216,11 +207,11 @@ class UNetLightning(LightningModule):
         end = time()
 
         # Calculate metrics
-        id = id[0] if len(id) == 1 else tuple(id)
+        id = id[0] if len(id) == 1 else id
+        #id = torch.tensor(int(id[-3:]), dtype=torch.int32)
 
         # Output dict with duration of inference
-        output = {"id": id, "time": end - start}
-        #output = {'time': end-start}
+        output = {"id": id}
 
         # Add other metrics to output dict
         for m, pars in zip(self.metrics, self.metrics_params):
@@ -232,9 +223,31 @@ class UNetLightning(LightningModule):
 
             output[f"test_{m.__name__}"] = metric_value
 
+        for k, v in output.items():
+            print('name', k, '\tvalue', v, '\ttype', type(v))
+
         return output
 
     # Test epoch end (= test end)
     def test_epoch_end(self, outputs):
-        self.test_results = outputs
+
+        # Metrics we'll save
+        metrics_dict = dict.fromkeys(outputs[0])
+
+        # Loop over metrics
+        for metric_name in metrics_dict:
+
+            # Temporary buffer metrics here
+            temp = []
+
+            # Average metric over outputs within epoch
+            for output in outputs:
+
+                temp.append(output[metric_name])
+
+            # Store in new dict
+            metrics_dict[metric_name] = torch.tensor(temp)
+
+        # Go over outputs and gather
+        self.test_results = self.all_gather(metrics_dict)
 
