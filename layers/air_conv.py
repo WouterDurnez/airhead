@@ -164,13 +164,17 @@ class AirConv3D(nn.Module):
                          'k_h', 'k_w', 'k_d']
             }
 
+        log(f'Creating CPD layer [comp={self.compression}, '
+            f'(Cin,Cout)=({self.in_channels},{self.out_channels}), '
+            f'kernel={self.kernel_size}, '
+            f'comp_friendly = {self.comp_friendly}].', verbosity=3, color='magenta')
+
+
         ##################################################
         # CANONICAL POLYADIC TENSOR DECOMPOSITION FORMAT #
         ##################################################
 
         if self.tensor_net_type in ['cp', 'canonical', 'cpd']:
-
-            log(f'Creating CPD layer [compression rate = {self.compression}].', verbosity=3, color='magenta')
 
             # First, obtain rank based on compression rate
             self.rank = self._get_tuning_par()
@@ -215,9 +219,6 @@ class AirConv3D(nn.Module):
         #################
 
         elif self.tensor_net_type in ['tucker']:
-
-            log(f'Creating Tucker layer [compression rate = {self.compression}].', verbosity=3,
-                color='magenta')
 
             """
             For the Tucker format, we need 3 nodes: 2 factor matrices and a core tensor: 
@@ -265,28 +266,23 @@ class AirConv3D(nn.Module):
 
         elif self.tensor_net_type in ['train', 'tensor-train', 'tt']:
 
-            log(f'Creating Tensor Train layer {("(alt version)" if self.tensor_net_type.endswith("2") else "")}'
-                f' [compression rate = {self.compression}].', verbosity=3, color='magenta')
-
             """
             For the TT format, we need 5 nodes:
              * 1 3rd-order tensor node for each of the kernel dimensions: U_k_h, U_k_w, U_kd,
              * 1 factor matrix for the input channels, 1 for the output channels: U_c_in and U_c_out
 
-              O - r1 - O - r2 - O - r3 - O - r4 - O
-              |        |        |        |        |
-             c_in     k_h      k_w      k_d      c_out
+              O - c_in/S - O - k - O - k - O - c_out/S - O
+              |            |       |       |             |
+             c_in          k       k       k           c_out
              """
 
-            # We tune the bond dimensions (assumed equal across the 'train')
-            self.r = round(self._get_tuning_par()) if round(self._get_tuning_par()) > 0 else 1
+            # We tune the bond dimensions
+            self.S = self._get_tuning_par()
 
             # Set bond dimensions, depending on type
-            if self.tensor_net_type.endswith("2"):
-                self.r1 = self.r4 = self.r
-                self.r2 = self.r3 = 3
-            else:
-                self.r1 = self.r2 = self.r3 = self.r4 = self.r
+            self.r1 = round(self.in_channels/self.S)
+            self.r4 = round(self.out_channels/self.S)
+            self.r2 = self.r3 = self.kernel_size
 
             # First kernel factor matrices (U_kh, U_kd, U_kw)
             nodes['U_k_h'] = {
@@ -479,7 +475,6 @@ class AirDoubleConvBlock(nn.Module):
                 out_channels=out_channels,
                 stride=stride,
                 tensor_net_type=tensor_net_type,
-                comp_friendly=comp_friendly,
                 **conv_params
             ),
 
@@ -496,7 +491,6 @@ class AirDoubleConvBlock(nn.Module):
                 out_channels=out_channels,
                 stride=1,
                 tensor_net_type=tensor_net_type,
-                comp_friendly=comp_friendly,
                 **conv_params
             ),
 
@@ -535,11 +529,12 @@ class AirResBlock(nn.Module):
         conv_params = {} if conv_params is None else conv_params
         conv_params.setdefault("kernel_size", 3)
         conv_params.setdefault("padding", 1)
+        conv_params.setdefault("comp_friendly", comp_friendly)
 
         self.conv1 = conv(
             tensor_net_type=tensor_net_type,
             compression=compression,
-            comp_friendly=comp_friendly,
+            #comp_friendly=comp_friendly,
             in_channels=in_channels,
             out_channels=out_channels,
             stride=stride,
@@ -549,9 +544,10 @@ class AirResBlock(nn.Module):
         self.conv2 = conv(
             tensor_net_type=tensor_net_type,
             compression=compression,
-            comp_friendly=comp_friendly,
+            #comp_friendly=comp_friendly,
             in_channels=out_channels,
             out_channels=out_channels,
+            **conv_params
         )
         self.norm2 = nn.GroupNorm(num_groups, out_channels)
         self.act = activation(inplace=True)

@@ -113,7 +113,7 @@ class AirUNet(nn.Module):
                                 activation=activation, conv_params=core_block_conv_params, **air_params)
 
         # Output
-        self.final_conv = AirConv3D(in_channels=self.widths[0], out_channels=out_channels, kernel_size=1, **air_params)
+        self.final_conv = nn.Conv3d(in_channels=self.widths[0], out_channels=out_channels, kernel_size=1)
         if self.head:
             # self.final_act = nn.Softmax(dim=1)
             self.final_act = nn.Sigmoid()
@@ -178,10 +178,10 @@ if __name__ == '__main__':
     log(f'Input size (single image): {x.size()}')
 
     # Initialize model
-    lr_unet = AirUNet(compression=2, tensor_net_type='cpd', comp_friendly=True,
+    lr_unet = AirUNet(compression=10, tensor_net_type='cp', comp_friendly=True,
                       in_channels=4, out_channels=3, head=False)
 
-    lr_unet_res = AirUNet(core_block=AirResBlock, compression=2, tensor_net_type='cpd', comp_friendly=True,
+    lr_unet_res = AirUNet(core_block=AirResBlock, compression=10, tensor_net_type='cp', comp_friendly=True,
                       in_channels=4, out_channels=3, head=False)
     # Process example input
     out_lr = lr_unet(x)
