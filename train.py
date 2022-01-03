@@ -11,6 +11,7 @@ Main training script for lightweight U-Net
 import argparse
 from os.path import join
 from pprint import PrettyPrinter
+import socket
 
 import numpy as np
 from medset.brats import BraTSDataModule
@@ -31,7 +32,7 @@ pp = PrettyPrinter()
 if __name__ == '__main__':
 
     # Debug mode
-    # debug = True if socket.gethostname() == 'lilith.lan' else False
+    #debug = True if socket.gethostname() == 'lilith.lan' else False
 
     # Get arguments
     parser = argparse.ArgumentParser()
@@ -57,7 +58,7 @@ if __name__ == '__main__':
     assert widths in (0, 1), \
         f"Choose a valid widths setting (0, 1), not <{widths}>"
 
-    widths = (32, 64, 128, 256, 512) if widths == 0 else (64, 128, 256, 512, 768)
+    widths = (32, 64, 128, 256, 512) if widths == 0 else (48, 96, 192, 384, 768)
     debug = args.debug
     if debug:
         log('DEBUG MODE', title=True, color='red')
@@ -68,6 +69,7 @@ if __name__ == '__main__':
         # Use base configuration
         config = CONFIG_BASE if not debug else DEBUG_CONFIG_BASE
         compression = 1
+        config['model']['network_params']['widths'] = widths
 
     else:
 
@@ -80,16 +82,23 @@ if __name__ == '__main__':
         config['model']['network_params']['tensor_net_type'] = net_type
         config['model']['network_params']['widths'] = widths
 
-    # Log config
-    log(config, color='red', timestamped=False)
-
     # Change kernel size if supplied
     if kernel_size:
+
+        # Adjust padding if necessary
+        padding = int((kernel_size-1)/2)
         if 'core_block_conv_params' in config['model']['network_params'].keys():
             config['model']['network_params']['core_block_conv_params']['kernel_size'] = kernel_size
+            config['model']['network_params']['core_block_conv_params']['padding'] = padding
         else:
             config['model']['network_params']['core_block_conv_params'] = {
-                'kernel_size': kernel_size}
+                'kernel_size': kernel_size,
+                'padding': padding,
+            }
+
+    # Log config
+    log('CONFIG', color='red', timestamped=False, title=True)
+    pp.pprint(config)
 
     # Let's go
     hlp.hi("Training lightweight U-Net", log_dir=config['logs']['log_dir'])
