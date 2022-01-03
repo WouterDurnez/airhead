@@ -202,15 +202,15 @@ class UNetLightning(LightningModule):
         x, y, id = batch["input"], batch["target"], batch["id"]
 
         # Infer and time inference
-        start = time()
+        #start = time()
         y_hat = self.test_inference(x, self, **self.test_inference_params)
-        end = time()
+        #end = time()
 
-        # Calculate metrics
+        # Parse id number
         id = id[0] if len(id) == 1 else id
         id = int(id[-3:])
 
-        # Output dict with duration of inference
+        # Initialize output dict
         output = {"id": id}
 
         # Add other metrics to output dict
@@ -222,9 +222,6 @@ class UNetLightning(LightningModule):
                 metric_value = metric_value.item()
 
             output[f"test_{m.__name__}"] = metric_value
-
-        for k, v in output.items():
-            print('name', k, '\tvalue', v, '\ttype', type(v))
 
         return output
 
