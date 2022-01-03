@@ -168,7 +168,12 @@ if __name__ == '__main__':
 
     # Initialize model
     base_model = UNet(in_channels=4, out_channels=3, head=False)
-    res_model = UNet(in_channels=4, out_channels=3, head=False, core_block=DoubleConvBlock)
+    res_model = UNet(in_channels=4, out_channels=3, head=False,
+                     core_block=ResBlock,
+                     core_block_conv_params={
+                         'kernel_size': 5,
+                         'padding': 2
+                     })
 
     # Process example input
     out_base = base_model(x)

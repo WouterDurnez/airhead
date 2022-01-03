@@ -202,6 +202,10 @@ if __name__ == '__main__':
     test_params = {
         'in_channels': 4,
         'out_channels': 32,
+        'conv_params': {
+            'kernel_size': 5,
+            'padding': 2,
+        },
         'stride': 1
     }
 
