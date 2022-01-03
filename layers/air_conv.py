@@ -271,18 +271,14 @@ class AirConv3D(nn.Module):
              * 1 3rd-order tensor node for each of the kernel dimensions: U_k_h, U_k_w, U_kd,
              * 1 factor matrix for the input channels, 1 for the output channels: U_c_in and U_c_out
 
-              O - c_in/S - O - k - O - k - O - c_out/S - O
-              |            |       |       |             |
-             c_in          k       k       k           c_out
+              O - r - O - r - O - r - O - r - O
+              |       |       |       |       |
+             c_in     k       k       k     c_out
              """
 
             # We tune the bond dimensions
-            self.S = self._get_tuning_par()
-
-            # Set bond dimensions, depending on type
-            self.r1 = round(self.in_channels/self.S) if round(self.in_channels/self.S) > 0 else 1
-            self.r4 = round(self.out_channels/self.S) if round(self.out_channels/self.S) > 0 else 1
-            self.r2 = self.r3 = self.kernel_size
+            self.r = round(self._get_tuning_par()) if round(self._get_tuning_par()) > 0 else 1
+            self.r1 = self.r2 = self.r3 = self.r4 = self.r
 
             # First kernel factor matrices (U_kh, U_kd, U_kw)
             nodes['U_k_h'] = {
@@ -458,12 +454,11 @@ class AirDoubleConvBlock(nn.Module):
         super().__init__()
         self.__name__ = __name__
 
-        # Initialize convolution parameters
+        # Initialize convolution parameters, set defaults
         conv_params = conv_params if conv_params else {}
-
-        # Set parameters (if not given!)
         conv_params.setdefault('kernel_size', 3)
         conv_params.setdefault('padding', 1)
+        conv_params.setdefault("comp_friendly", comp_friendly)
 
         # Define inner block architecture
         self.block = nn.Sequential(
@@ -649,8 +644,9 @@ if __name__ == '__main__':
     # Double conv test
     double_conv_classic = DoubleConvBlock(in_channels=in_channels, out_channels=out_channels)
     double_conv_classic_output = double_conv_classic(image)
-    double_conv_cpd = AirResBlock(tensor_net_type='cpd', compression=20,
+    double_conv_cpd = AirDoubleConvBlock(tensor_net_type='cpd', compression=20,
                                   in_channels=in_channels, out_channels=out_channels,
+                                  comp_friendly=True,
                                   num_groups=8)
     double_conv_cpd_output = double_conv_cpd(image)
 
