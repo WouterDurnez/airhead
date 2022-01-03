@@ -189,21 +189,12 @@ def get_tuning_par(compression: int, tensor_net_type: str, in_channels: int, out
     if tensor_net_type in ['tt', 'tensor-train', 'train']:
         '''
         tensor train params:
-        (in_channels * in_channels/S) + 
-        (in_channels/S * 3 * kernel_size) +
-        (3*3*kernel_size) +
-        (out_channels/S * 3 * kernel_size) +
-        (out_channels * out_channels/S)
-
+        r * (in_channels + r*(3+3+3) + out_channels)
         compression = max_params / tt_params     
         '''
-        S = Symbol('S', real=True, positive=True)
+        r = Symbol('r', real=True, positive=True)
         solutions = solve(max_params /
-                          ((in_channels * (in_channels / S)) +
-                           (in_channels / S * kernel_size ** 2) +
-                           (kernel_size ** 3) +
-                           (out_channels / S * kernel_size ** 2) +
-                           (out_channels * out_channels / S)) - compression, S)
+                          (r * (in_channels + 3 * (3 * r) + out_channels)) - compression, r)
 
         # Check for appropriate S values
         evaluated_solutions = []
@@ -261,23 +252,9 @@ def get_network_size(tuning_param: float, tensor_net_type: str, in_channels: int
     elif tensor_net_type in ['tt', 'tensor-train', 'train']:
         '''
         tensor train params:
-        in_channels**2/S + 
-        in_channels/S * kernel_size**2 +
-        kernel_size**3 +
-        out_channels/S * kernel_size**2 +
-        out_channels**2/S + 
+        r * (in_channels + r*(3+3+3) + out_channels)
         '''
-
-        in_param = round(in_channels / tuning_param) if round(in_channels / tuning_param) > 0 else 1
-        out_param = round(out_channels / tuning_param) if round(out_channels / tuning_param) > 0 else 1
-        in_param_squared = in_param * in_channels
-        out_param_squared = out_param * out_channels
-
-        return in_param_squared + \
-               out_param_squared + \
-               in_param * kernel_size ** 2 + \
-               out_param * kernel_size ** 2 + \
-               kernel_size ** 3
+        return tuning_param * (in_channels + tuning_param * 9 + out_channels)
 
 
 if __name__ == '__main__':
