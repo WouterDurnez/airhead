@@ -10,18 +10,17 @@ Configuration for HPC training
 
 from copy import deepcopy
 
-from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
+from pytorch_lightning.callbacks import LearningRateMonitor
 from pytorch_lightning.plugins import DDPPlugin
 from torch.optim import AdamW
 
-from layers.air_conv import AirResBlock
-from layers.base_layers import ResBlock
-from models.air_unet import AirUNet
-from models.base_unet import UNet
-from training.inference import test_inference
-from training.losses import dice_loss
-from training.metrics import *
-from utils.utils import WarmupCosineSchedule
+from src.layers.air_conv import AirResBlock
+from src.layers.base_layers import ResBlock
+from src.models.air_unet import AirUNet
+from src.models import UNet
+from src.training import test_inference
+from src.training import dice_loss
+from src.utils import WarmupCosineSchedule
 
 GENERAL = {
     "model": {

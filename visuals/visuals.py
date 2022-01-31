@@ -18,9 +18,9 @@ import seaborn as sns
 import torch
 from matplotlib.colors import ListedColormap
 
-import utils.helper as hlp
-from training.data_module import BraTSDataModule
-from utils.helper import set_dir, log
+import src.utils.helper as hlp
+from src.training import BraTSDataModule
+from src.utils import set_dir, log
 
 #colors = sns.color_palette('Reds', n_colors=3)
 #colors = ('red','green','yellow')
