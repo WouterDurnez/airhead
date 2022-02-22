@@ -126,7 +126,7 @@ def build_metrics_dataframe():
 
 if __name__ == '__main__':
 
-    hlp.hi('Analysis', log_dir='../../logs/')
+    hlp.hi('Analysis', log_dir='/Users/wouter/Library/CloudStorage/OneDrive-Personal/Education/KULeuven/MAI/013_THESIS/implementation/self/logs/')
     vis_dir = join(hlp.DATA_DIR, '../visuals')
     rebuild = True
 

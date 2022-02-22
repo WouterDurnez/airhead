@@ -15,25 +15,51 @@ from torch.nn import Module
 
 VERBOSITY = 3
 TIMESTAMPED = True
-DATA_DIR = join(Path(os.path.dirname(os.path.abspath(__file__))).parents[1], 'data')
-LOG_DIR = join(Path(os.path.dirname(os.path.abspath(__file__))).parents[1], 'logs')
-TENSOR_NET_TYPES = ('cp', 'cpd', 'canonical', 'tucker', 'train', 'tensor-train', 'tt')
+DATA_DIR = join(
+    Path(os.path.dirname(os.path.abspath(__file__))).parents[1], 'data'
+)
+LOG_DIR = join(
+    Path(os.path.dirname(os.path.abspath(__file__))).parents[1], 'logs'
+)
+TENSOR_NET_TYPES = (
+    'cp',
+    'cpd',
+    'canonical',
+    'tucker',
+    'train',
+    'tensor-train',
+    'tt',
+)
 KUL_PAL = ['#FF7251', '#C58B85', '#8CA5B8', '#52BEEC']
-KUL_PAL2 = ['#FF7251', '#E67D67', '#CE887D','#B59393','#9C9DAA','#83A8C0','#6BB3D6','#52BEEC']
+KUL_PAL2 = [
+    '#FF7251',
+    '#E67D67',
+    '#CE887D',
+    '#B59393',
+    '#9C9DAA',
+    '#83A8C0',
+    '#6BB3D6',
+    '#52BEEC',
+]
 
 # Set parameters
-def set_params(verbosity: int = None, timestamped: bool = None, data_dir: str = None, log_dir: str = None):
+def set_params(
+    verbosity: int = None,
+    timestamped: bool = None,
+    data_dir: str = None,
+    log_dir: str = None,
+):
     global VERBOSITY
     global TIMESTAMPED
     global DATA_DIR
     global LOG_DIR
 
-    set_dir(DATA_DIR, LOG_DIR)
-
     VERBOSITY = verbosity if verbosity else VERBOSITY
     TIMESTAMPED = timestamped if timestamped is not None else TIMESTAMPED
     DATA_DIR = data_dir if data_dir else DATA_DIR
     LOG_DIR = log_dir if log_dir else LOG_DIR
+
+    set_dir(DATA_DIR, LOG_DIR)
 
 
 def hi(title=None, **params):
@@ -42,12 +68,12 @@ def hi(title=None, **params):
     If there's anything to initialize, do so here.
     """
 
-    print("\n")
+    print('\n')
     print(Fore.BLUE, end='')
-    print("     ___   _     __               __")
-    print("    / _ | (_)___/ /  ___ ___ ____/ /")
-    print("   / __ |/ / __/ _ \/ -_) _ `/ _  /")
-    print("  /_/ |_/_/_/ /_//_/\__/\_,_/\_,_/", end='')
+    print('     ___   _     __               __')
+    print('    / _ | (_)___/ /  ___ ___ ____/ /')
+    print('   / __ |/ / __/ _ \/ -_) _ `/ _  /')
+    print('  /_/ |_/_/_/ /_//_/\__/\_,_/\_,_/', end='')
     print(Style.RESET_ALL)
     print()
 
@@ -62,7 +88,7 @@ def hi(title=None, **params):
 
     # Set directories
     if not os.path.exists(DATA_DIR) or not os.path.exists(LOG_DIR):
-         set_dir(DATA_DIR, LOG_DIR)
+        set_dir(DATA_DIR, LOG_DIR)
 
     # Set seed
     seed_everything(616, workers=True)
@@ -84,7 +110,9 @@ def whatsgoingon(layer: Callable, input: Tensor):
 
 
 # Fancy print
-def log(*message, verbosity=3, sep="", timestamped=None, title=False, color=None):
+def log(
+    *message, verbosity=3, sep='', timestamped=None, title=False, color=None
+):
     """
     Print wrapper that adds timestamp, and can be used to toggle levels of logging info.
 
@@ -127,10 +155,15 @@ def log(*message, verbosity=3, sep="", timestamped=None, title=False, color=None
         # Print regular
         else:
             ts = timestamped if timestamped is not None else TIMESTAMPED
-            t = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            t = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
             if color:
                 print(color, end='')
-            print((str(t) + (" - " if sep == "" else "-")) if ts else "", *message, Style.RESET_ALL, sep=sep)
+            print(
+                (str(t) + (' - ' if sep == '' else '-')) if ts else '',
+                *message,
+                Style.RESET_ALL,
+                sep=sep,
+            )
 
     return
 
@@ -147,7 +180,14 @@ def time_it(f: Callable):
         res = f(*args, **kwargs)
         t2 = time.time()
 
-        log("\'", f.__name__, "\' took ", round(t2 - t1, 3), " seconds to complete.", sep="")
+        log(
+            "'",
+            f.__name__,
+            "' took ",
+            round(t2 - t1, 3),
+            ' seconds to complete.',
+            sep='',
+        )
 
         return res
 
@@ -164,10 +204,15 @@ def set_dir(*dirs):
 
     for dir in dirs:
         if not os.path.exists(dir):
-            os.makedirs(dir,exist_ok=True)
-            log("WARNING: Data directory <{dir}> did not exist yet, and was created.".format(dir=dir), verbosity=1)
+            os.makedirs(dir, exist_ok=True)
+            log(
+                'WARNING: Data directory <{dir}> did not exist yet, and was created.'.format(
+                    dir=dir
+                ),
+                verbosity=1,
+            )
         else:
-            log("\'{}\' folder accounted for.".format(dir), verbosity=3)
+            log("'{}' folder accounted for.".format(dir), verbosity=3)
 
 
 def count_params(module: Module, format=None, precision=3):
@@ -190,6 +235,7 @@ def count_params(module: Module, format=None, precision=3):
 
     else:
         return n
+
 
 if __name__ == '__main__':
     hi('Test!')

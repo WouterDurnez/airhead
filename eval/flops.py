@@ -18,8 +18,8 @@ import src.utils.helper as hlp
 from src.layers.air_conv import count_lr_conv3d, AirConv3D, AirResBlock
 from src.layers.base_layers import ResBlock
 from src.models.air_unet import AirUNet
-from src.models import UNet
-from src.utils import log, hi, TENSOR_NET_TYPES
+from src.models.base_unet import UNet
+from src.utils.helper import log, hi, TENSOR_NET_TYPES
 
 pp = PrettyPrinter()
 

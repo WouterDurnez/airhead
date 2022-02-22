@@ -19,6 +19,7 @@ from time import time
 # Lightning wrapper for UNet model #
 ####################################
 
+
 class UNetLightning(LightningModule):
     def __init__(
         self,
@@ -103,11 +104,11 @@ class UNetLightning(LightningModule):
         optimizer = self.optimizer(
             self.net.parameters(), **self.optimizer_params
         )
-        if hasattr(self, "scheduler"):
+        if hasattr(self, 'scheduler'):
             scheduler = self.scheduler(optimizer, **self.scheduler_params)
             config = (
                 [optimizer],
-                [{"scheduler": scheduler, **self.scheduler_config}],
+                [{'scheduler': scheduler, **self.scheduler_config}],
             )
         else:
             config = [optimizer]
@@ -122,12 +123,12 @@ class UNetLightning(LightningModule):
     def training_step(self, batch, batch_idx):
 
         # Get new input and predict, then calculate loss
-        x, y = batch["input"], batch["target"]
+        x, y = batch['input'], batch['target']
         y_hat = self(x)
         loss = self.loss(y_hat, y, **self.loss_params)
 
         # Log output and calculate metrics
-        self.log(f"train_{self.loss.__name__}", loss, prog_bar=True)
+        self.log(f'train_{self.loss.__name__}', loss, prog_bar=True)
         return loss
 
     # Training epoch end
@@ -145,25 +146,25 @@ class UNetLightning(LightningModule):
                 metric_total += output[metric_name]
             metric_value = metric_total / len(outputs)
 
-            if hasattr(metric_value, "item"):
+            if hasattr(metric_value, 'item'):
                 metric_value = metric_value.item()
             self.log(metric_name, metric_value, prog_bar=True)
 
             # Log using Tensorboard logger
-            self.logger.experiment.add_scalar(f"{metric_name}/train", metric_value, self.current_epoch)
+            # self.logger.experiment.add_scalar(f"{metric_name}/train", metric_value, self.current_epoch)
 
     # Validation step
     def validation_step(self, batch, batch_idx):
 
         # Get new input and predict, then calculate loss
-        x, y = batch["input"], batch["target"]
+        x, y = batch['input'], batch['target']
 
         y_hat = self.inference(x, self, **self.inference_params)
 
         # Calculate metrics
         output = {}
         for m, pars in zip(self.metrics, self.metrics_params):
-            output[f"val_{m.__name__}"] = m(y_hat, y, **pars)
+            output[f'val_{m.__name__}'] = m(y_hat, y, **pars)
         return output
 
     # Validation epoch end
@@ -180,11 +181,13 @@ class UNetLightning(LightningModule):
             for output in outputs:
 
                 # Unpack value in tensor
-                if hasattr(output[metric_name],'item'):
+                if hasattr(output[metric_name], 'item'):
                     output[metric_name] = output[metric_name].item()
 
                 # Check for NaN and Inf values and skip those
-                if not np.isnan(output[metric_name]) and not np.isinf(output[metric_name]):
+                if not np.isnan(output[metric_name]) and not np.isinf(
+                    output[metric_name]
+                ):
                     metric_total += output[metric_name]
 
             # Take average (excluding NaN and Inf)
@@ -193,35 +196,35 @@ class UNetLightning(LightningModule):
             self.log(metric_name, metric_value, prog_bar=True)
 
             # Log using Tensorboard logger
-            self.logger.experiment.add_scalar(f"{metric_name}/val",metric_value,self.current_epoch)
+            # self.logger.experiment.add_scalar(f"{metric_name}/val",metric_value,self.current_epoch)
 
     # Test step
     def test_step(self, batch, batch_idx):
 
         # Get new input and predict, then calculate loss
-        x, y, id = batch["input"], batch["target"], batch["id"]
+        x, y, id = batch['input'], batch['target'], batch['id']
 
         # Infer and time inference
-        #start = time()
+        # start = time()
         y_hat = self.test_inference(x, self, **self.test_inference_params)
-        #end = time()
+        # end = time()
 
         # Parse id number
         id = id[0] if len(id) == 1 else id
         id = int(id[-3:])
 
         # Initialize output dict
-        output = {"id": id}
+        output = {'id': id}
 
         # Add other metrics to output dict
         for m, pars in zip(self.metrics, self.metrics_params):
 
             metric_value = m(y_hat, y, **pars)
 
-            if hasattr(metric_value, "item"):
+            if hasattr(metric_value, 'item'):
                 metric_value = metric_value.item()
 
-            output[f"test_{m.__name__}"] = metric_value
+            output[f'test_{m.__name__}'] = metric_value
 
         return output
 
@@ -234,9 +237,9 @@ class UNetLightning(LightningModule):
         # Loop over metrics
         for metric_name in metrics_dict:
 
-            """ We'll store all these metric values in a list, 
+            """We'll store all these metric values in a list,
             so we can turn it into a single tensor after.
-            This is to accommodate `self.all_gather()`. """
+            This is to accommodate `self.all_gather()`."""
             temp = []
             for output in outputs:
                 temp.append(output[metric_name])
@@ -246,4 +249,3 @@ class UNetLightning(LightningModule):
 
         # Go over outputs and gather
         self.test_results = self.all_gather(metrics_dict)
-

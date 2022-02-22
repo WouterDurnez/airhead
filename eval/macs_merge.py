@@ -7,9 +7,10 @@
 """
 Merge flop metrics
 """
+import ast
 import os
 from os.path import join
-import ast
+
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -20,9 +21,6 @@ from src.utils.helper import KUL_PAL, KUL_PAL2
 kul_pal = sns.color_palette(KUL_PAL, as_cmap=True)
 kul_pal2 = sns.color_palette(KUL_PAL2, as_cmap=True)
 pd.set_option('display.float_format', lambda x: '%.3f' % x)
-
-
-
 
 if __name__ == '__main__':
 
@@ -37,7 +35,7 @@ if __name__ == '__main__':
         if f == 'model_flops.npy':
             continue
 
-        data = np.load(join(hlp.LOG_DIR,f), allow_pickle=True).item()
+        data = np.load(join(hlp.LOG_DIR, f), allow_pickle=True).item()
 
         params = f.split('.')[0].split('_')[2:]
 

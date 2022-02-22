@@ -29,7 +29,7 @@ if __name__ == '__main__':
                 '#BASELINE\n')
 
         for fold in range(5):
-            command = f'qsub jobscript_air.pbs -v TYPE=base,COMP=1,FOLD={fold},KERNEL={KERNEL_SIZES[0]},WIDTHS={WIDTHS[1]}\n'
+            command = f'qsub jobscript_air.pbs -v TYPE=base,COMP=1,FOLD={fold},KERNEL={KERNEL_SIZES[1]},WIDTHS={WIDTHS[0]}\n'
             f.write(command)
 
     with open(f'../../jobscripts/jobs_flops_base_batch.sh', 'w') as f:
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     h.log('Creating tensorized jobscripts...')
     for fold in range(5):
 
-        with open(f'../../jobscripts/jobs_air_bigwidth_tucker_fold{fold}.sh', 'w') as f:
+        with open(f'../../jobscripts/jobs_air_bigkernel_tucker_fold{fold}.sh', 'w') as f:
 
             f.write(f'#!/bin/bash\n'
                     f'\n#FOLD {fold}\n')
@@ -55,7 +55,7 @@ if __name__ == '__main__':
                 f.write(f'#COMPRESSION {comp}\n')
 
                 for type in TENSOR_NET_TYPES:
-                    command = f'qsub jobscript_air.pbs -v TYPE={type},FOLD={fold},COMP={comp},KERNEL={KERNEL_SIZES[0]},WIDTHS={WIDTHS[1]}\n'
+                    command = f'qsub jobscript_air.pbs -v TYPE={type},FOLD={fold},COMP={comp},KERNEL={KERNEL_SIZES[1]},WIDTHS={WIDTHS[0]}\n'
                     f.write(command)
 
     with open(f'../../jobscripts/jobs_flops_tensorized_batch.sh', 'w') as f:
