@@ -52,3 +52,4 @@ venv.bak/
 
 # Interim data
 *.npy
+/eval/_old/

@@ -664,7 +664,6 @@ class AirResBlock(nn.Module):
 
 if __name__ == '__main__':
     # Console parameters
-    # set_params(verbosity=3, timestamped=False)
     hi('Lightweight layer sanity check', verbosity=3, timestamped=True)
 
     # Quick test (currently no cuda support on my end)
