@@ -167,27 +167,27 @@ if __name__ == '__main__':
     brats = BraTSDataModule(**config['data'])
 
     # Initialize logger
-    tb_logger = TensorBoardLogger(
+    """config['training']['logger'] = TensorBoardLogger(
         save_dir=tb_dir,
         name=model_name,
         default_hp_metric=False,
         version=version,
-    )
+    )"""
 
     # Prep checkpointing
-    config['training']['callbacks'].append(
+    """config['training']['callbacks'].append(
         ModelCheckpoint(
             dirpath=ckpt_dir,
             filename=f'{model_name}_v{version}_fold{fold_index}',
             save_on_train_epoch_end=True,
             every_n_epochs=10,
         )
-    )
+    )"""
 
     # Initialize trainer
     log('Initializing trainer.')
     trainer = Trainer(
-        **config['training'], num_sanity_val_steps=0, logger=tb_logger
+        **config['training'], num_sanity_val_steps=0
     )
 
     # Set up fitting
