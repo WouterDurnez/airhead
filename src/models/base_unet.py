@@ -13,6 +13,7 @@ Isensee, F., Jaeger, P. F., Full, P. M., Vollmuth, P., & Maier-Hein, K. H. (2020
 import torch
 import torch.nn as nn
 from torch import cat
+from torch.nn.modules import Conv3d
 
 from src.layers.base_layers import DoubleConvBlock, Upsample, ResBlock
 from src.utils.helper import *
@@ -27,6 +28,7 @@ class UNet(nn.Module):
             widths=(32, 64, 128, 256, 320),
             activation: nn.Module = nn.LeakyReLU,
             core_block: nn.Module = DoubleConvBlock,
+            core_block_conv: nn.Module = Conv3d,
             core_block_conv_params: dict = None,
             downsample='strided_convolution',
             up_par=None,
@@ -68,18 +70,18 @@ class UNet(nn.Module):
         5 segments composed of double convolution blocks, followed by strided convolutoin (downsampling)
         """
         self.enc_1 = core_block(in_channels=self.in_channels, out_channels=self.widths[0],
-                                stride=1, activation=activation, conv_params=core_block_conv_params)
+                                stride=1, activation=activation, conv=core_block_conv, conv_params=core_block_conv_params)
         self.enc_2 = core_block(in_channels=self.widths[0], out_channels=self.widths[1],
-                                activation=activation, conv_params=core_block_conv_params)
+                                activation=activation, conv=core_block_conv, conv_params=core_block_conv_params)
         self.enc_3 = core_block(in_channels=self.widths[1], out_channels=self.widths[2],
-                                activation=activation, conv_params=core_block_conv_params)
+                                activation=activation, conv=core_block_conv, conv_params=core_block_conv_params)
         self.enc_4 = core_block(in_channels=self.widths[2], out_channels=self.widths[3],
-                                activation=activation, conv_params=core_block_conv_params)
+                                activation=activation, conv=core_block_conv, conv_params=core_block_conv_params)
         self.enc_5 = core_block(in_channels=self.widths[3], out_channels=self.widths[4],
-                                activation=activation, conv_params=core_block_conv_params)
+                                activation=activation, conv=core_block_conv, conv_params=core_block_conv_params)
 
         # BRIDGE
-        self.bridge = core_block(self.widths[4], self.widths[4])
+        self.bridge = core_block(self.widths[4], self.widths[4], conv=core_block_conv, conv_params=core_block_conv_params)
 
         # DECODER
         """
@@ -87,19 +89,19 @@ class UNet(nn.Module):
         """
         self.up_1 = Upsample(self.widths[4], self.widths[4], up_par=up_par)
         self.dec_1 = core_block(2 * self.widths[4], self.widths[3], stride=1, activation=activation,
-                                conv_params=core_block_conv_params)  # double the filters due to concatenation
+                                conv=core_block_conv, conv_params=core_block_conv_params)  # double the filters due to concatenation
         self.up_2 = Upsample(self.widths[3], self.widths[3], up_par=up_par)
         self.dec_2 = core_block(2 * self.widths[3], self.widths[2], stride=1, activation=activation,
-                                conv_params=core_block_conv_params)
+                                conv=core_block_conv, conv_params=core_block_conv_params)
         self.up_3 = Upsample(self.widths[2], self.widths[2], up_par=up_par)
         self.dec_3 = core_block(2 * self.widths[2], self.widths[1], stride=1, activation=activation,
-                                conv_params=core_block_conv_params)
+                                conv=core_block_conv, conv_params=core_block_conv_params)
         self.up_4 = Upsample(self.widths[1], self.widths[1], up_par=up_par)
         self.dec_4 = core_block(2 * self.widths[1], self.widths[0], stride=1, activation=activation,
-                                conv_params=core_block_conv_params)
+                                conv=core_block_conv, conv_params=core_block_conv_params)
         self.up_5 = Upsample(self.widths[0], self.widths[0], up_par=up_par)
         self.dec_5 = core_block(2 * self.widths[0], self.widths[0], stride=1, activation=activation,
-                                conv_params=core_block_conv_params)
+                                conv=core_block_conv, conv_params=core_block_conv_params)
 
         # Output
         self.final_conv = nn.Conv3d(in_channels=self.widths[0], out_channels=out_channels, kernel_size=1)

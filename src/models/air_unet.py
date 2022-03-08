@@ -11,7 +11,8 @@ import torch
 import torch.nn as nn
 from torch import cat
 
-from src.layers.air_conv import AirDoubleConvBlock, AirResBlock
+from src.layers.air_layers import AirConv3D
+from src.layers.air_layers import AirDoubleConvBlock, AirResBlock
 from src.layers.base_layers import Upsample
 from src.utils.helper import log, set_params
 
@@ -27,6 +28,7 @@ class AirUNet(nn.Module):
             widths=(32, 64, 128, 256, 320),
             activation=nn.LeakyReLU,
             core_block: nn.Module = AirDoubleConvBlock,
+            core_block_conv: nn.Module = AirConv3D,
             core_block_conv_params: dict = None,
             downsample='strided_convolution',
             comp_friendly: bool = True,
@@ -77,40 +79,40 @@ class AirUNet(nn.Module):
 
         # ENCODER
         """
-        5 segments composed of double convolution blocks, followed by strided convolutoin (downsampling)
+        5 segments composed of double convolution blocks, followed by strided convolution (downsampling)
         """
         self.enc_1 = core_block(in_channels=self.in_channels, out_channels=self.widths[0],
-                                stride=1, activation=activation, conv_params=core_block_conv_params, **air_params)
+                                stride=1, activation=activation, conv=core_block_conv, conv_params=core_block_conv_params, **air_params)
         self.enc_2 = core_block(in_channels=self.widths[0], out_channels=self.widths[1],
-                                activation=activation, conv_params=core_block_conv_params, **air_params)
+                                activation=activation, conv=core_block_conv,conv_params=core_block_conv_params, **air_params)
         self.enc_3 = core_block(in_channels=self.widths[1], out_channels=self.widths[2],
-                                activation=activation, conv_params=core_block_conv_params, **air_params)
+                                activation=activation, conv=core_block_conv,conv_params=core_block_conv_params, **air_params)
         self.enc_4 = core_block(in_channels=self.widths[2], out_channels=self.widths[3],
-                                activation=activation, conv_params=core_block_conv_params, **air_params)
+                                activation=activation, conv=core_block_conv,conv_params=core_block_conv_params, **air_params)
         self.enc_5 = core_block(in_channels=self.widths[3], out_channels=self.widths[4],
-                                activation=activation, conv_params=core_block_conv_params,**air_params)
+                                activation=activation, conv=core_block_conv,conv_params=core_block_conv_params,**air_params)
 
-        # BRIDGE
-        self.bridge = AirDoubleConvBlock(in_channels=self.widths[4], out_channels=self.widths[4], **air_params)
+        # BRIDGE 
+        self.bridge = core_block(in_channels=self.widths[4], out_channels=self.widths[4],conv=core_block_conv, **air_params)
         # DECODER
         """
         5 segments composed of transposed convolutions (upsampling) and double convolution blocks
         """
         self.up_1 = Upsample(self.widths[4], self.widths[4], up_par=up_par)
         self.dec_1 = core_block(in_channels=2 * self.widths[4], out_channels=self.widths[3], stride=1,
-                                activation=activation, conv_params=core_block_conv_params, **air_params)  # double the filters due to concatenation
+                                activation=activation,conv=core_block_conv, conv_params=core_block_conv_params, **air_params)  # double the filters due to concatenation
         self.up_2 = Upsample(self.widths[3], self.widths[3], up_par=up_par)
         self.dec_2 = core_block(in_channels=2 * self.widths[3], out_channels=self.widths[2], stride=1,
-                                activation=activation, conv_params=core_block_conv_params, **air_params)
+                                activation=activation,conv=core_block_conv, conv_params=core_block_conv_params, **air_params)
         self.up_3 = Upsample(self.widths[2], self.widths[2], up_par=up_par)
         self.dec_3 = core_block(in_channels=2 * self.widths[2], out_channels=self.widths[1], stride=1,
-                                activation=activation, conv_params=core_block_conv_params, **air_params)
+                                activation=activation,conv=core_block_conv, conv_params=core_block_conv_params, **air_params)
         self.up_4 = Upsample(self.widths[1], self.widths[1], up_par=up_par)
         self.dec_4 = core_block(in_channels=2 * self.widths[1], out_channels=self.widths[0], stride=1,
                                 activation=activation, conv_params=core_block_conv_params, **air_params)
         self.up_5 = Upsample(self.widths[0], self.widths[0], up_par=up_par)
         self.dec_5 = core_block(in_channels=2 * self.widths[0], out_channels=self.widths[0], stride=1,
-                                activation=activation, conv_params=core_block_conv_params, **air_params)
+                                activation=activation,conv=core_block_conv, conv_params=core_block_conv_params, **air_params)
 
         # Output
         self.final_conv = nn.Conv3d(in_channels=self.widths[0], out_channels=out_channels, kernel_size=1)
@@ -172,19 +174,19 @@ if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Create appropriately dimensioned tensor with random values
-    dim = 96
+    dim = 128
     x = torch.rand(1, 4, dim, dim, dim)
     x.to(device)
     log(f'Input size (single image): {x.size()}')
 
     # Initialize model
-    lr_unet = AirUNet(compression=10, tensor_net_type='cp', comp_friendly=True,
-                      in_channels=4, out_channels=3, head=False)
+    '''lr_unet = AirUNet(compression=10, tensor_net_type='cp', comp_friendly=True,
+                      in_channels=4, out_channels=3, head=False)'''
 
-    lr_unet_res = AirUNet(core_block=AirResBlock, compression=20, tensor_net_type='tt', comp_friendly=True,
+    lr_unet_res = AirUNet(core_block=AirResBlock, compression=256, tensor_net_type='cp', comp_friendly=True,
                       in_channels=4, out_channels=3, head=False)
     # Process example input
-    out_lr = lr_unet(x)
+    #out_lr = lr_unet(x)
     out_lr_res = lr_unet_res(x)
-    log(f'Output size (double conv block): {out_lr.size()}')
+    #log(f'Output size (double conv block): {out_lr.size()}')
     log(f'Output size (res block): {out_lr_res.size()}')
