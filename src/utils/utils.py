@@ -162,7 +162,7 @@ def get_tuning_par(
         rank = max_params / (
             compression * (in_channels + out_channels + 3 * kernel_size)
         )
-        return round(rank)
+        return round(rank) if round(rank) != 0 else 1
 
     ##########
     # TUCKER #
