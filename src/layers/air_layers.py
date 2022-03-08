@@ -15,7 +15,6 @@ import copy
 import math
 from pprint import PrettyPrinter
 
-import numpy as np
 import opt_einsum as oe
 import torch
 import torch.nn as nn
@@ -24,7 +23,7 @@ from torch import Tensor
 from torch.nn.functional import conv3d
 
 from src.models.base_unet import DoubleConvBlock
-from src.utils.helper import log, hi, TENSOR_NET_TYPES
+from src.utils.helper import log, hi, TENSOR_NET_TYPES, whatsgoingon
 from src.utils.utils import get_tuning_par, get_network_size
 
 pp = PrettyPrinter(4)
@@ -62,33 +61,6 @@ def get_patches(
     return patches
 
 
-def count_lr_conv3d(module, _, y):
-    """
-    Flop count hook for ptflops, to be used with LowRankConv3D
-    """
-
-    # All output elements
-    output_voxels = y.nelement()
-
-    # Output voxels (per channel)
-    output_voxels_per_channel = np.prod(y.shape[2:])
-
-    # Kernel flops, given by path_info (see LowRankConv3D)
-    kernel_flops = module.kernel_flops
-
-    # We add bias to each voxel in all output channels
-    bias_flops = output_voxels if module.bias is not None else 0
-
-    # We're calculating macs, not flops (hence the /2). Output channels
-    # are included in the path_cost, hence we multiply by output_voxels
-    # rather than output_elements
-    total_ops = output_voxels_per_channel * kernel_flops / 2 + bias_flops
-
-    # print(f'{module.__name__}: kernel ops {kernel_flops} - bias ops {bias_flops} \t TOTAL {total_ops}')
-
-    module.__flops__ += int(total_ops)
-
-
 ###################################
 # Low-rank 3D convolutional layer #
 ###################################
@@ -106,6 +78,7 @@ class AirConv3D(nn.Module):
         padding: int = 1,
         bias: bool = True,
         comp_friendly: bool = False,
+        quiet:bool = True,
     ):
 
         super().__init__()
@@ -122,6 +95,7 @@ class AirConv3D(nn.Module):
         self.bias = bias
 
         self.comp_friendly = comp_friendly
+        self.quiet = quiet
 
         assert (
             self.tensor_net_type in TENSOR_NET_TYPES
@@ -186,7 +160,8 @@ class AirConv3D(nn.Module):
                 'legs': ['-b', 'c_in', '-h', '-w', '-d', 'k_h', 'k_w', 'k_d'],
             }
 
-        log(
+        if not self.quiet:
+            log(
             f'Creating CP layer [comp={self.compression}, '
             f'(Cin,Cout)=({self.in_channels},{self.out_channels}), '
             f'kernel={self.kernel_size}, '
