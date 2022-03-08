@@ -13,7 +13,7 @@ from copy import deepcopy
 from pytorch_lightning.callbacks import LearningRateMonitor, ModelCheckpoint
 from torch.optim import AdamW
 
-from src.layers.air_conv import AirResBlock
+from src.layers.air_layers import AirResBlock
 from src.layers.base_layers import ResBlock
 from src.models.air_unet import AirUNet
 from src.models.base_unet import UNet

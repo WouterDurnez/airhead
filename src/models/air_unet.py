@@ -92,7 +92,7 @@ class AirUNet(nn.Module):
         self.enc_5 = core_block(in_channels=self.widths[3], out_channels=self.widths[4],
                                 activation=activation, conv=core_block_conv,conv_params=core_block_conv_params,**air_params)
 
-        # BRIDGE 
+        # BRIDGE
         self.bridge = core_block(in_channels=self.widths[4], out_channels=self.widths[4],conv=core_block_conv, **air_params)
         # DECODER
         """
