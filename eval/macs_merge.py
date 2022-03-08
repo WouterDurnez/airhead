@@ -44,18 +44,23 @@ if __name__ == '__main__':
         widths = ast.literal_eval(params[2][1:])
         kernel_size = int(params[3][1:])
 
-        s = pd.Series({
-            'type': type,
-            'compression': compression,
-            'widths': widths,
-            'kernel_size': kernel_size,
-            'macs': data[type][compression][widths][kernel_size]['macs'],
-            'params': data[type][compression][widths][kernel_size]['params'],
-
-        })
+        s = pd.Series(
+            {
+                'type': type,
+                'compression': compression,
+                'widths': widths,
+                'kernel_size': kernel_size,
+                'macs': data[type][compression][widths][kernel_size]['macs'],
+                'params': data[type][compression][widths][kernel_size][
+                    'params'
+                ],
+            }
+        )
 
         rows.append(s)
 
     df = pd.DataFrame(rows)
-    df.sort_values(by=['type', 'kernel_size', 'widths', 'compression'], inplace=True)
-    df.to_csv("df_macs_params.csv", index=False)
+    df.sort_values(
+        by=['type', 'kernel_size', 'widths', 'compression'], inplace=True
+    )
+    df.to_csv('df_macs_params.csv', index=False)
