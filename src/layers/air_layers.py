@@ -162,7 +162,7 @@ class AirConv3D(nn.Module):
 
         if not self.quiet:
             log(
-            f'Creating CP layer [comp={self.compression}, '
+            f'Creating {self.tensor_net_type} layer [comp={self.compression}, '
             f'(Cin,Cout)=({self.in_channels},{self.out_channels}), '
             f'kernel={self.kernel_size}, '
             f'comp_friendly = {self.comp_friendly}].',
