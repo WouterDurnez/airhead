@@ -63,7 +63,7 @@ def generate_test_params(base_only=False) -> list:
             'comp': 1,
             'type': 'base',
             'widths': w,
-            'kernel': k,
+            'kernel_size': k,
         }
         for w, k in ((0, 3), (0, 5), (1, 3))
     ]
@@ -79,7 +79,7 @@ def generate_test_params(base_only=False) -> list:
                 'comp': c,
                 'type': t,
                 'widths': 0,
-                'kernel': 3,
+                'kernel_size': 3,
             }
         )
     # ABLATION
@@ -89,7 +89,7 @@ def generate_test_params(base_only=False) -> list:
                 'comp': c,
                 'type': 'tucker',
                 'widths': w,
-                'kernel': k,
+                'kernel_size': k,
             }
         )
     return test_params
@@ -144,10 +144,8 @@ if __name__ == '__main__':
     log('Begin MAC & parameter count.')
     for params in tqdm(test_params, desc='Counting...'):
 
-        print(params)
-
         # Set some necessary extra parameters
-        padding = int((params['kernel'] - 1) / 2)
+        padding = int((params['kernel_size'] - 1) / 2)
         widths = (
             (32, 64, 128, 256, 512)
             if params['widths'] == 0
@@ -163,8 +161,8 @@ if __name__ == '__main__':
                 core_block=ResBlock,
                 core_block_conv=Conv3d,
                 core_block_conv_params={
-                    'kernel_size': params['kernel'],
-                    'padding': int((params['kernel'] - 1) / 2),
+                    'kernel_size': params['kernel_size'],
+                    'padding': padding,
                 },
             )
         else:
@@ -177,8 +175,8 @@ if __name__ == '__main__':
                 core_block=AirResBlock,
                 core_block_conv=DummyAirConv3D,
                 core_block_conv_params={
-                    'kernel_size': params['kernel'],
-                    'padding': int((params['kernel'] - 1) / 2),
+                    'kernel_size': params['kernel_size'],
+                    'padding': padding,
                 },
                 comp_friendly=False,
             )
