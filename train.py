@@ -34,7 +34,8 @@ if __name__ == '__main__':
     # Parse arguments
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '-t', '--type',
+        '-t',
+        '--type',
         help='Network type (base, cp, tt, tucker)',
         default='base',
         type=str,
@@ -42,21 +43,35 @@ if __name__ == '__main__':
     parser.add_argument(
         '-c', '--comp', help='Compression rate (int)', default=1, type=int
     )
-    parser.add_argument('-f','--fold', help='Fold index (0-4)', default=0, type=int)
     parser.add_argument(
-        '-k','--kernel',
+        '-f', '--fold', help='Fold index (0-4)', default=0, type=int
+    )
+    parser.add_argument(
+        '-k',
+        '--kernel',
         help='Kernel size for core block convolutions (default: 3)',
         default=3,
         type=int,
     )
     parser.add_argument(
-        '-d','--debug', action='store_true', help='Use debug config', default=False
+        '-d',
+        '--debug',
+        action='store_true',
+        help='Use debug config',
+        default=False,
     )
     parser.add_argument(
-        '-w','--widths', help='Width configuration to use', default=0, type=int
+        '-w',
+        '--widths',
+        help='Width configuration to use',
+        default=0,
+        type=int,
     )
     parser.add_argument(
-        '-ckpt','--checkpoint', action='store_true', help='Start from checkpoint'
+        '-ckpt',
+        '--checkpoint',
+        action='store_true',
+        help='Start from checkpoint',
     )
     args = parser.parse_args()
 
@@ -167,12 +182,12 @@ if __name__ == '__main__':
     brats = BraTSDataModule(**config['data'])
 
     # Initialize logger
-    """config['training']['logger'] = TensorBoardLogger(
+    config['training']['logger'] = TensorBoardLogger(
         save_dir=tb_dir,
         name=model_name,
         default_hp_metric=False,
         version=version,
-    )"""
+    )
 
     # Prep checkpointing
     """config['training']['callbacks'].append(
@@ -186,9 +201,7 @@ if __name__ == '__main__':
 
     # Initialize trainer
     log('Initializing trainer.')
-    trainer = Trainer(
-        **config['training'], num_sanity_val_steps=0
-    )
+    trainer = Trainer(**config['training'], num_sanity_val_steps=0)
 
     # Set up fitting
     fit_params = {'model': model, 'datamodule': brats}

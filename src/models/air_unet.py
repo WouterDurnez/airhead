@@ -20,20 +20,20 @@ from src.utils.helper import log, set_params
 # Low-Rank 3D-UNet architecture
 class AirUNet(nn.Module):
     def __init__(
-            self,
-            compression: int,
-            tensor_net_type: str,
-            in_channels: int,
-            out_channels: int,
-            widths=(32, 64, 128, 256, 320),
-            activation=nn.LeakyReLU,
-            core_block: nn.Module = AirDoubleConvBlock,
-            core_block_conv: nn.Module = AirConv3D,
-            core_block_conv_params: dict = None,
-            downsample='strided_convolution',
-            comp_friendly: bool = True,
-            up_par=None,
-            head=True
+        self,
+        compression: int,
+        tensor_net_type: str,
+        in_channels: int,
+        out_channels: int,
+        widths=(32, 64, 128, 256, 320),
+        activation=nn.LeakyReLU,
+        core_block: nn.Module = AirDoubleConvBlock,
+        core_block_conv: nn.Module = AirConv3D,
+        core_block_conv_params: dict = None,
+        downsample='strided_convolution',
+        comp_friendly: bool = True,
+        up_par=None,
+        head=True,
     ):
         super().__init__()
 
@@ -48,14 +48,18 @@ class AirUNet(nn.Module):
         self.head = head
 
         if not downsample == 'strided_convolution':
-            raise NotImplementedError('Only <strided convolution> downsample method implemented!')
+            raise NotImplementedError(
+                'Only <strided convolution> downsample method implemented!'
+            )
 
         ##############
         # Parameters #
         ##############
 
         # Set default parameters for double convolution
-        core_block_conv_params = core_block_conv_params if core_block_conv_params else {}
+        core_block_conv_params = (
+            core_block_conv_params if core_block_conv_params else {}
+        )
         core_block_conv_params.setdefault('kernel_size', 3)
         core_block_conv_params.setdefault('padding', 1)
 
@@ -63,7 +67,7 @@ class AirUNet(nn.Module):
         air_params = {
             'tensor_net_type': self.tensor_net_type,
             'compression': self.compression,
-            'comp_friendly': self.comp_friendly
+            'comp_friendly': self.comp_friendly,
         }
 
         # Set default parameters for upsampling (transposed convolution)
@@ -81,41 +85,116 @@ class AirUNet(nn.Module):
         """
         5 segments composed of double convolution blocks, followed by strided convolution (downsampling)
         """
-        self.enc_1 = core_block(in_channels=self.in_channels, out_channels=self.widths[0],
-                                stride=1, activation=activation, conv=core_block_conv, conv_params=core_block_conv_params, **air_params)
-        self.enc_2 = core_block(in_channels=self.widths[0], out_channels=self.widths[1],
-                                activation=activation, conv=core_block_conv,conv_params=core_block_conv_params, **air_params)
-        self.enc_3 = core_block(in_channels=self.widths[1], out_channels=self.widths[2],
-                                activation=activation, conv=core_block_conv,conv_params=core_block_conv_params, **air_params)
-        self.enc_4 = core_block(in_channels=self.widths[2], out_channels=self.widths[3],
-                                activation=activation, conv=core_block_conv,conv_params=core_block_conv_params, **air_params)
-        self.enc_5 = core_block(in_channels=self.widths[3], out_channels=self.widths[4],
-                                activation=activation, conv=core_block_conv,conv_params=core_block_conv_params,**air_params)
+        self.enc_1 = core_block(
+            in_channels=self.in_channels,
+            out_channels=self.widths[0],
+            stride=1,
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+            **air_params,
+        )
+        self.enc_2 = core_block(
+            in_channels=self.widths[0],
+            out_channels=self.widths[1],
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+            **air_params,
+        )
+        self.enc_3 = core_block(
+            in_channels=self.widths[1],
+            out_channels=self.widths[2],
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+            **air_params,
+        )
+        self.enc_4 = core_block(
+            in_channels=self.widths[2],
+            out_channels=self.widths[3],
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+            **air_params,
+        )
+        self.enc_5 = core_block(
+            in_channels=self.widths[3],
+            out_channels=self.widths[4],
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+            **air_params,
+        )
 
         # BRIDGE
-        self.bridge = core_block(in_channels=self.widths[4], out_channels=self.widths[4],conv=core_block_conv, **air_params)
+        self.bridge = core_block(
+            in_channels=self.widths[4],
+            out_channels=self.widths[4],
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+            **air_params,
+        )
         # DECODER
         """
         5 segments composed of transposed convolutions (upsampling) and double convolution blocks
         """
         self.up_1 = Upsample(self.widths[4], self.widths[4], up_par=up_par)
-        self.dec_1 = core_block(in_channels=2 * self.widths[4], out_channels=self.widths[3], stride=1,
-                                activation=activation,conv=core_block_conv, conv_params=core_block_conv_params, **air_params)  # double the filters due to concatenation
+        self.dec_1 = core_block(
+            in_channels=2 * self.widths[4],
+            out_channels=self.widths[3],
+            stride=1,
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+            **air_params,
+        )  # double the filters due to concatenation
         self.up_2 = Upsample(self.widths[3], self.widths[3], up_par=up_par)
-        self.dec_2 = core_block(in_channels=2 * self.widths[3], out_channels=self.widths[2], stride=1,
-                                activation=activation,conv=core_block_conv, conv_params=core_block_conv_params, **air_params)
+        self.dec_2 = core_block(
+            in_channels=2 * self.widths[3],
+            out_channels=self.widths[2],
+            stride=1,
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+            **air_params,
+        )
         self.up_3 = Upsample(self.widths[2], self.widths[2], up_par=up_par)
-        self.dec_3 = core_block(in_channels=2 * self.widths[2], out_channels=self.widths[1], stride=1,
-                                activation=activation,conv=core_block_conv, conv_params=core_block_conv_params, **air_params)
+        self.dec_3 = core_block(
+            in_channels=2 * self.widths[2],
+            out_channels=self.widths[1],
+            stride=1,
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+            **air_params,
+        )
         self.up_4 = Upsample(self.widths[1], self.widths[1], up_par=up_par)
-        self.dec_4 = core_block(in_channels=2 * self.widths[1], out_channels=self.widths[0], stride=1,
-                                activation=activation, conv_params=core_block_conv_params, **air_params)
+        self.dec_4 = core_block(
+            in_channels=2 * self.widths[1],
+            out_channels=self.widths[0],
+            stride=1,
+            activation=activation,
+            conv_params=core_block_conv_params,
+            **air_params,
+        )
         self.up_5 = Upsample(self.widths[0], self.widths[0], up_par=up_par)
-        self.dec_5 = core_block(in_channels=2 * self.widths[0], out_channels=self.widths[0], stride=1,
-                                activation=activation,conv=core_block_conv, conv_params=core_block_conv_params, **air_params)
+        self.dec_5 = core_block(
+            in_channels=2 * self.widths[0],
+            out_channels=self.widths[0],
+            stride=1,
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+            **air_params,
+        )
 
         # Output
-        self.final_conv = nn.Conv3d(in_channels=self.widths[0], out_channels=out_channels, kernel_size=1)
+        self.final_conv = nn.Conv3d(
+            in_channels=self.widths[0],
+            out_channels=out_channels,
+            kernel_size=1,
+        )
         if self.head:
             # self.final_act = nn.Softmax(dim=1)
             self.final_act = nn.Sigmoid()
@@ -141,7 +220,9 @@ class AirUNet(nn.Module):
         dec_1 = self.dec_1(cat_1)  # dec_1 has widths[3] (256)
 
         up_2 = self.up_2(dec_1)
-        cat_2 = cat([up_2, enc_4], dim=1)  # up_2 has widths[3] (256) + enc_5 has widths[4] (320) = 640
+        cat_2 = cat(
+            [up_2, enc_4], dim=1
+        )  # up_2 has widths[3] (256) + enc_5 has widths[4] (320) = 640
         dec_2 = self.dec_2(cat_2)
 
         up_3 = self.up_3(dec_2)
@@ -180,13 +261,21 @@ if __name__ == '__main__':
     log(f'Input size (single image): {x.size()}')
 
     # Initialize model
-    '''lr_unet = AirUNet(compression=10, tensor_net_type='cp', comp_friendly=True,
-                      in_channels=4, out_channels=3, head=False)'''
+    """lr_unet = AirUNet(compression=10, tensor_net_type='cp', comp_friendly=True,
+                      in_channels=4, out_channels=3, head=False)"""
 
-    lr_unet_res = AirUNet(core_block=AirResBlock, compression=256, tensor_net_type='cp', comp_friendly=True,
-                      in_channels=4, out_channels=3, head=False)
+    lr_unet_res = AirUNet(
+        core_block=AirResBlock,
+        compression=256,
+        tensor_net_type='cp',
+        comp_friendly=True,
+        in_channels=4,
+        out_channels=3,
+        head=False,
+        core_block_conv_params={'quiet': False},
+    )
     # Process example input
-    #out_lr = lr_unet(x)
+    # out_lr = lr_unet(x)
     out_lr_res = lr_unet_res(x)
-    #log(f'Output size (double conv block): {out_lr.size()}')
+    # log(f'Output size (double conv block): {out_lr.size()}')
     log(f'Output size (res block): {out_lr_res.size()}')

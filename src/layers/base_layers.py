@@ -19,9 +19,7 @@ from src.utils.helper import hi, log
 
 # Downsample block
 class DownsampleMax(nn.Module):
-
-    def __init__(self,
-                 down_par=None):
+    def __init__(self, down_par=None):
         super().__init__()
         self.__name__ = 'max_pool_3d'
 
@@ -31,23 +29,16 @@ class DownsampleMax(nn.Module):
         down_par.setdefault('stride', 2)
         down_par.setdefault('padding', 0)
 
-        self.block = nn.Sequential(
-            nn.MaxPool3d(**down_par)
-        )
+        self.block = nn.Sequential(nn.MaxPool3d(**down_par))
 
     # Forward propagation
     def forward(self, input):
-        return (self.block(input))
+        return self.block(input)
 
 
 # Upsample block (currently transposed convolution)
 class Upsample(nn.Module):
-
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 up_par=None
-                 ):
+    def __init__(self, in_channels, out_channels, up_par=None):
         super().__init__()
         self.__name__ = 'trans_conv'
 
@@ -74,25 +65,24 @@ class Upsample(nn.Module):
 
 # ResNet block
 class ResBlock(nn.Module):
-
     def __init__(
-            self,
-            in_channels: int,
-            out_channels: int,
-            stride: int = 2,
-            num_groups: int = 8,
-            activation:nn.Module = nn.LeakyReLU,
-            conv: nn.Module = nn.Conv3d,
-            conv_params: dict = None,
-            name:str ='res_block',
+        self,
+        in_channels: int,
+        out_channels: int,
+        stride: int = 2,
+        num_groups: int = 8,
+        activation: nn.Module = nn.LeakyReLU,
+        conv: nn.Module = nn.Conv3d,
+        conv_params: dict = None,
+        name: str = 'res_block',
     ):
         super().__init__()
         self.__name__ = name
 
         # Initialize convolution parameters, set defaults
         conv_params = {} if conv_params is None else conv_params
-        conv_params.setdefault("kernel_size", 3)
-        conv_params.setdefault("padding", 1)
+        conv_params.setdefault('kernel_size', 3)
+        conv_params.setdefault('padding', 1)
 
         self.conv1 = conv(
             in_channels, out_channels, stride=stride, **conv_params
@@ -132,17 +122,16 @@ class ResBlock(nn.Module):
 
 # Double convolution block
 class DoubleConvBlock(nn.Module):
-
     def __init__(
-            self,
-            in_channels: int,
-            out_channels: int,
-            stride: int = 2,
-            num_groups: int = 8,
-            activation:nn.Module = nn.LeakyReLU,
-            conv: nn.Module = nn.Conv3d,
-            conv_params: dict = None,
-            name:str='double_conv_block',
+        self,
+        in_channels: int,
+        out_channels: int,
+        stride: int = 2,
+        num_groups: int = 8,
+        activation: nn.Module = nn.LeakyReLU,
+        conv: nn.Module = nn.Conv3d,
+        conv_params: dict = None,
+        name: str = 'double_conv_block',
     ):
         super().__init__()
         self.__name__ = name
@@ -156,29 +145,27 @@ class DoubleConvBlock(nn.Module):
 
         # Define inner block architecture
         self.block = nn.Sequential(
-
             # Convolution layer
-            conv(in_channels=in_channels,
-                 out_channels=out_channels,
-                 stride=stride,
-                 **conv_params),
-
+            conv(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                stride=stride,
+                **conv_params,
+            ),
             # Normalization layer (default minibatch of 8 instances)
             nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
-
             # Activation layer
             activation(inplace=True),
-
             # Convolution layer
-            conv(in_channels=out_channels,
-                 out_channels=out_channels,
-                 **conv_params),
-
+            conv(
+                in_channels=out_channels,
+                out_channels=out_channels,
+                **conv_params,
+            ),
             # Normalization layer (default minibatch of 8 instances)
             nn.GroupNorm(num_groups=num_groups, num_channels=out_channels),
-
             # Activation layer
-            activation(inplace=True)
+            activation(inplace=True),
         )
 
     # Forward function (backward propagation is added automatically)
@@ -206,7 +193,7 @@ if __name__ == '__main__':
             'kernel_size': 5,
             'padding': 2,
         },
-        'stride': 1
+        'stride': 1,
     }
 
     # Init blocks

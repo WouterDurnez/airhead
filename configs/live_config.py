@@ -60,7 +60,7 @@ GENERAL = {
     },
     'training': {
         'max_steps': 102000,  # -> sys.maxsize (which works for any #steps)
-        'gpus': 2,
+        'gpus': 0,
         'num_nodes': 1,
         'strategy': DDPPlugin(find_unused_parameters=False),
         'deterministic': True,
@@ -87,7 +87,7 @@ AIR_MODEL = {
     'network': AirUNet,
     'network_params': {
         'core_block': AirResBlock,
-        'core_block_conv_params': {'comp_friendly': True},
+        'core_block_conv_params': {'comp_friendly': True, 'quiet': False},
         'in_channels': 4,
         'out_channels': 3,
         # "widths": (32, 64, 128, 256, 512),

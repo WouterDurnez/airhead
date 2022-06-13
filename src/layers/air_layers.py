@@ -78,7 +78,7 @@ class AirConv3D(nn.Module):
         padding: int = 1,
         bias: bool = True,
         comp_friendly: bool = False,
-        quiet:bool = True,
+        quiet: bool = True,
     ):
 
         super().__init__()
@@ -127,7 +127,7 @@ class AirConv3D(nn.Module):
 
         # Calculate actual compression rate
         self.max_params = (
-            self.kernel_size ** 3 * self.in_channels * self.out_channels
+            self.kernel_size**3 * self.in_channels * self.out_channels
         )
         self.kernel_params = self._get_tensor_network_size()
         self.actual_compression = self.max_params / self.kernel_params
@@ -162,13 +162,13 @@ class AirConv3D(nn.Module):
 
         if not self.quiet:
             log(
-            f'Creating {self.tensor_net_type} layer [comp={self.compression}, '
-            f'(Cin,Cout)=({self.in_channels},{self.out_channels}), '
-            f'kernel={self.kernel_size}, '
-            f'comp_friendly = {self.comp_friendly}].',
-            verbosity=3,
-            color='magenta',
-        )
+                f'Creating {self.tensor_net_type} layer [comp={self.compression}, '
+                f'(Cin,Cout)=({self.in_channels},{self.out_channels}), '
+                f'kernel={self.kernel_size}, '
+                f'comp_friendly = {self.comp_friendly}].',
+                verbosity=3,
+                color='magenta',
+            )
 
         ##################################################
         # CANONICAL POLYADIC TENSOR DECOMPOSITION FORMAT #
@@ -694,7 +694,7 @@ if __name__ == '__main__':
     tt_output = layer_tt(image)
     assert (
         canon_output.size() == classic_output.size()
-    ), "Something went wrong with CPD format, output shapes don't match!"
+    ), "Something went wrong with CP format, output shapes don't match!"
     assert (
         tucker_output.size() == classic_output.size()
     ), "Something went wrong with Tucker format, output shapes don't match!"

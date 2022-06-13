@@ -29,6 +29,7 @@ from torch import nn
 # Metrics #
 ###########
 
+
 class DiceMetric(CumulativeIterationMetric):
     """
     Compute average Dice loss between two tensors. It can support both multi-classes and multi-labels tasks.
@@ -54,11 +55,11 @@ class DiceMetric(CumulativeIterationMetric):
     """
 
     def __init__(
-            self,
-            include_background: bool = True,
-            include_zero_masks: bool = True,
-            reduction: Union[MetricReduction, str] = MetricReduction.MEAN,
-            get_not_nans: bool = False,
+        self,
+        include_background: bool = True,
+        include_zero_masks: bool = True,
+        reduction: Union[MetricReduction, str] = MetricReduction.MEAN,
+        get_not_nans: bool = False,
     ) -> None:
         super().__init__()
         self.include_background = include_background
@@ -80,19 +81,19 @@ class DiceMetric(CumulativeIterationMetric):
             ValueError: when `y_pred` has less than three dimensions.
         """
         if not isinstance(y_pred, torch.Tensor) or not isinstance(
-                y, torch.Tensor
+            y, torch.Tensor
         ):
-            raise ValueError("y_pred and y must be PyTorch Tensor.")
+            raise ValueError('y_pred and y must be PyTorch Tensor.')
 
         if not torch.all(y_pred.byte() == y_pred):
-            warnings.warn("y_pred should be a binarized tensor.")
+            warnings.warn('y_pred should be a binarized tensor.')
 
         if not torch.all(y.byte() == y):
-            raise ValueError("y should be a binarized tensor.")
+            raise ValueError('y should be a binarized tensor.')
 
         dims = y_pred.ndimension()
         if dims < 3:
-            raise ValueError("y_pred should have at least three dimensions.")
+            raise ValueError('y_pred should have at least three dimensions.')
 
         # compute dice (BxC) for each channel for each batch
         if not self.include_background:
@@ -102,7 +103,7 @@ class DiceMetric(CumulativeIterationMetric):
         y_pred = y_pred.float()
 
         if y.shape != y_pred.shape:
-            raise ValueError("y_pred and y should have same shapes.")
+            raise ValueError('y_pred and y should have same shapes.')
 
         # reduce only spatial dimensions (not batch nor channels)
         reduce_axis = list(range(2, y_pred.ndim))
@@ -121,7 +122,7 @@ class DiceMetric(CumulativeIterationMetric):
             output = torch.where(
                 ap > 0,
                 (2.0 * intersection) / denominator,
-                torch.tensor(float("nan"), device=ap.device),
+                torch.tensor(float('nan'), device=ap.device),
             )
 
         return output
@@ -131,7 +132,7 @@ class DiceMetric(CumulativeIterationMetric):
 
         data = self.get_buffer()
         if not isinstance(data, torch.Tensor):
-            raise ValueError("the data to aggregate must be PyTorch Tensor.")
+            raise ValueError('the data to aggregate must be PyTorch Tensor.')
 
         # do metric reduction
         f, not_nans = do_metric_reduction(data, self.reduction)
@@ -166,14 +167,14 @@ class HausdorffDistanceMetric(CumulativeIterationMetric):
     """
 
     def __init__(
-            self,
-            include_background: bool = False,
-            include_zero_masks: bool = True,
-            distance_metric: str = "euclidean",
-            percentile: Optional[float] = None,
-            directed: bool = False,
-            reduction: Union[MetricReduction, str] = MetricReduction.MEAN,
-            get_not_nans: bool = False,
+        self,
+        include_background: bool = False,
+        include_zero_masks: bool = True,
+        distance_metric: str = 'euclidean',
+        percentile: Optional[float] = None,
+        directed: bool = False,
+        reduction: Union[MetricReduction, str] = MetricReduction.MEAN,
+        get_not_nans: bool = False,
     ) -> None:
         super().__init__()
         self.include_background = include_background
@@ -198,19 +199,19 @@ class HausdorffDistanceMetric(CumulativeIterationMetric):
             ValueError: when `y_pred` has less than three dimensions.
         """
         if not isinstance(y_pred, torch.Tensor) or not isinstance(
-                y, torch.Tensor
+            y, torch.Tensor
         ):
-            raise ValueError("y_pred and y must be PyTorch Tensor.")
+            raise ValueError('y_pred and y must be PyTorch Tensor.')
 
         if not torch.all(y_pred.byte() == y_pred):
-            warnings.warn("y_pred should be a binarized tensor.")
+            warnings.warn('y_pred should be a binarized tensor.')
 
         if not torch.all(y.byte() == y):
-            raise ValueError("y should be a binarized tensor.")
+            raise ValueError('y should be a binarized tensor.')
 
         dims = y_pred.ndimension()
         if dims < 3:
-            raise ValueError("y_pred should have at least three dimensions.")
+            raise ValueError('y_pred should have at least three dimensions.')
 
         # compute (BxC) for each channel for each batch
         if not self.include_background:
@@ -223,7 +224,7 @@ class HausdorffDistanceMetric(CumulativeIterationMetric):
             y_pred = y_pred.float()
 
         if y.shape != y_pred.shape:
-            raise ValueError("y_pred and y should have same shapes.")
+            raise ValueError('y_pred and y should have same shapes.')
 
         batch_size, n_class = y_pred.shape[:2]
         hd = np.empty((batch_size, n_class))
@@ -231,11 +232,11 @@ class HausdorffDistanceMetric(CumulativeIterationMetric):
             (edges_pred, edges_gt) = get_mask_edges(y_pred[b, c], y[b, c])
             if not np.any(edges_gt):
                 warnings.warn(
-                    f"the ground truth of class {c} is all 0, this may result in nan/inf distance."
+                    f'the ground truth of class {c} is all 0, this may result in nan/inf distance.'
                 )
             if not np.any(edges_pred):
                 warnings.warn(
-                    f"the prediction of class {c} is all 0, this may result in nan/inf distance."
+                    f'the prediction of class {c} is all 0, this may result in nan/inf distance.'
                 )
 
             distance_1 = self.compute_percent_hausdorff_distance(
@@ -257,18 +258,18 @@ class HausdorffDistanceMetric(CumulativeIterationMetric):
         """
         data = self.get_buffer()
         if not isinstance(data, torch.Tensor):
-            raise ValueError("the data to aggregate must be PyTorch Tensor.")
+            raise ValueError('the data to aggregate must be PyTorch Tensor.')
 
         # do metric reduction
         f, not_nans = do_metric_reduction(data, self.reduction)
         return (f, not_nans) if self.get_not_nans else f
 
     def compute_percent_hausdorff_distance(
-            self,
-            edges_pred: np.ndarray,
-            edges_gt: np.ndarray,
-            distance_metric: str = "euclidean",
-            percentile: Optional[float] = None,
+        self,
+        edges_pred: np.ndarray,
+        edges_gt: np.ndarray,
+        distance_metric: str = 'euclidean',
+        percentile: Optional[float] = None,
     ):
         """
         This function is used to compute the directed Hausdorff distance.
@@ -290,7 +291,7 @@ class HausdorffDistanceMetric(CumulativeIterationMetric):
             return np.percentile(surface_distance, percentile)
 
         raise ValueError(
-            f"percentile should be a value between 0 and 100, get {percentile}."
+            f'percentile should be a value between 0 and 100, get {percentile}.'
         )
 
 
@@ -300,19 +301,19 @@ class SensitivityMetric(nn.Module):
 
     def forward(self, y_pred: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         if not torch.all(y_pred.byte() == y_pred):
-            warnings.warn("y_pred is not a binarized tensor here!")
+            warnings.warn('y_pred is not a binarized tensor here!')
 
         if not torch.all(y.byte() == y):
-            raise ValueError("y should be a binarized tensor.")
+            raise ValueError('y should be a binarized tensor.')
 
         if y_pred.ndim < 3:
-            raise ValueError("y_pred should have at least three dimensions.")
+            raise ValueError('y_pred should have at least three dimensions.')
 
         y = y.float()
         y_pred = y_pred.float()
 
         if y.shape != y_pred.shape:
-            raise ValueError("y_pred and y should have same shapes.")
+            raise ValueError('y_pred and y should have same shapes.')
 
         # Compute dice (BxC) for each channel for each batch
         # Reduce only spatial dimensions (not batch nor channels)
@@ -332,19 +333,19 @@ class SpecificityMetric(nn.Module):
 
     def forward(self, y_pred: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         if not torch.all(y_pred.byte() == y_pred):
-            warnings.warn("y_pred is not a binarized tensor here!")
+            warnings.warn('y_pred is not a binarized tensor here!')
 
         if not torch.all(y.byte() == y):
-            raise ValueError("y should be a binarized tensor.")
+            raise ValueError('y should be a binarized tensor.')
 
         if y_pred.ndim < 3:
-            raise ValueError("y_pred should have at least three dimensions.")
+            raise ValueError('y_pred should have at least three dimensions.')
 
         y = y.float()
         y_pred = y_pred.float()
 
         if y.shape != y_pred.shape:
-            raise ValueError("y_pred and y should have same shapes.")
+            raise ValueError('y_pred and y should have same shapes.')
 
         # Compute dice (BxC) for each channel for each batch
         # Reduce only spatial dimensions (not batch nor channels)
@@ -440,5 +441,3 @@ if __name__ == '__main__':
     # Test metrics
     # dm = dice_metric(y, x)
     hdm = hd_et(y, x)
-
-

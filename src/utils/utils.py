@@ -146,7 +146,7 @@ def get_tuning_par(
     ), f'Choose a valid tensor network {TENSOR_NET_TYPES}'
 
     # Number of parameters for a full-rank convolution
-    max_params = in_channels * out_channels * kernel_size ** 3
+    max_params = in_channels * out_channels * kernel_size**3
 
     #######
     # CPD #
@@ -182,12 +182,12 @@ def get_tuning_par(
             (
                 max_params
                 / (
-                    ((in_channels ** 2) / S)
-                    + ((out_channels ** 2) / S)
+                    ((in_channels**2) / S)
+                    + ((out_channels**2) / S)
                     + (
                         (in_channels / S)
                         * (out_channels / S)
-                        * kernel_size ** 3
+                        * kernel_size**3
                     )
                 )
             )
@@ -287,7 +287,7 @@ def get_network_size(
         return (
             in_param_squared
             + out_param_squared
-            + (in_param * out_param * kernel_size ** 3)
+            + (in_param * out_param * kernel_size**3)
         )
 
     ################
@@ -314,7 +314,7 @@ if __name__ == '__main__':
     comp = 2
 
     # Number of parameters in full kernel
-    max_param = in_channels * out_channels * kernel_size ** 3
+    max_param = in_channels * out_channels * kernel_size**3
 
     # We'll calculate tuning parameters and resulting actual compression rates
     # for a number of compression rate settings

@@ -22,17 +22,17 @@ from src.utils.helper import *
 # Full 3D-UNet architecture
 class UNet(nn.Module):
     def __init__(
-            self,
-            in_channels,
-            out_channels,
-            widths=(32, 64, 128, 256, 320),
-            activation: nn.Module = nn.LeakyReLU,
-            core_block: nn.Module = DoubleConvBlock,
-            core_block_conv: nn.Module = Conv3d,
-            core_block_conv_params: dict = None,
-            downsample='strided_convolution',
-            up_par=None,
-            head=True
+        self,
+        in_channels,
+        out_channels,
+        widths=(32, 64, 128, 256, 320),
+        activation: nn.Module = nn.LeakyReLU,
+        core_block: nn.Module = DoubleConvBlock,
+        core_block_conv: nn.Module = Conv3d,
+        core_block_conv_params: dict = None,
+        downsample='strided_convolution',
+        up_par=None,
+        head=True,
     ):
         super().__init__()
 
@@ -43,14 +43,18 @@ class UNet(nn.Module):
         self.head = head
 
         if not downsample == 'strided_convolution':
-            raise NotImplementedError('Only <strided convolution> downsample method implemented!')
+            raise NotImplementedError(
+                'Only <strided convolution> downsample method implemented!'
+            )
 
         ##############
         # Parameters #
         ##############
 
         # Set default parameters for double convolution
-        core_block_conv_params = core_block_conv_params if core_block_conv_params else {}
+        core_block_conv_params = (
+            core_block_conv_params if core_block_conv_params else {}
+        )
         core_block_conv_params.setdefault('kernel_size', 3)
         core_block_conv_params.setdefault('padding', 1)
 
@@ -69,42 +73,107 @@ class UNet(nn.Module):
         """
         5 segments composed of double convolution blocks, followed by strided convolutoin (downsampling)
         """
-        self.enc_1 = core_block(in_channels=self.in_channels, out_channels=self.widths[0],
-                                stride=1, activation=activation, conv=core_block_conv, conv_params=core_block_conv_params)
-        self.enc_2 = core_block(in_channels=self.widths[0], out_channels=self.widths[1],
-                                activation=activation, conv=core_block_conv, conv_params=core_block_conv_params)
-        self.enc_3 = core_block(in_channels=self.widths[1], out_channels=self.widths[2],
-                                activation=activation, conv=core_block_conv, conv_params=core_block_conv_params)
-        self.enc_4 = core_block(in_channels=self.widths[2], out_channels=self.widths[3],
-                                activation=activation, conv=core_block_conv, conv_params=core_block_conv_params)
-        self.enc_5 = core_block(in_channels=self.widths[3], out_channels=self.widths[4],
-                                activation=activation, conv=core_block_conv, conv_params=core_block_conv_params)
+        self.enc_1 = core_block(
+            in_channels=self.in_channels,
+            out_channels=self.widths[0],
+            stride=1,
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+        )
+        self.enc_2 = core_block(
+            in_channels=self.widths[0],
+            out_channels=self.widths[1],
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+        )
+        self.enc_3 = core_block(
+            in_channels=self.widths[1],
+            out_channels=self.widths[2],
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+        )
+        self.enc_4 = core_block(
+            in_channels=self.widths[2],
+            out_channels=self.widths[3],
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+        )
+        self.enc_5 = core_block(
+            in_channels=self.widths[3],
+            out_channels=self.widths[4],
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+        )
 
         # BRIDGE
-        self.bridge = core_block(self.widths[4], self.widths[4], conv=core_block_conv, conv_params=core_block_conv_params)
+        self.bridge = core_block(
+            self.widths[4],
+            self.widths[4],
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+        )
 
         # DECODER
         """
         5 segments composed of transposed convolutions (upsampling) and double convolution blocks
         """
         self.up_1 = Upsample(self.widths[4], self.widths[4], up_par=up_par)
-        self.dec_1 = core_block(2 * self.widths[4], self.widths[3], stride=1, activation=activation,
-                                conv=core_block_conv, conv_params=core_block_conv_params)  # double the filters due to concatenation
+        self.dec_1 = core_block(
+            2 * self.widths[4],
+            self.widths[3],
+            stride=1,
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+        )  # double the filters due to concatenation
         self.up_2 = Upsample(self.widths[3], self.widths[3], up_par=up_par)
-        self.dec_2 = core_block(2 * self.widths[3], self.widths[2], stride=1, activation=activation,
-                                conv=core_block_conv, conv_params=core_block_conv_params)
+        self.dec_2 = core_block(
+            2 * self.widths[3],
+            self.widths[2],
+            stride=1,
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+        )
         self.up_3 = Upsample(self.widths[2], self.widths[2], up_par=up_par)
-        self.dec_3 = core_block(2 * self.widths[2], self.widths[1], stride=1, activation=activation,
-                                conv=core_block_conv, conv_params=core_block_conv_params)
+        self.dec_3 = core_block(
+            2 * self.widths[2],
+            self.widths[1],
+            stride=1,
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+        )
         self.up_4 = Upsample(self.widths[1], self.widths[1], up_par=up_par)
-        self.dec_4 = core_block(2 * self.widths[1], self.widths[0], stride=1, activation=activation,
-                                conv=core_block_conv, conv_params=core_block_conv_params)
+        self.dec_4 = core_block(
+            2 * self.widths[1],
+            self.widths[0],
+            stride=1,
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+        )
         self.up_5 = Upsample(self.widths[0], self.widths[0], up_par=up_par)
-        self.dec_5 = core_block(2 * self.widths[0], self.widths[0], stride=1, activation=activation,
-                                conv=core_block_conv, conv_params=core_block_conv_params)
+        self.dec_5 = core_block(
+            2 * self.widths[0],
+            self.widths[0],
+            stride=1,
+            activation=activation,
+            conv=core_block_conv,
+            conv_params=core_block_conv_params,
+        )
 
         # Output
-        self.final_conv = nn.Conv3d(in_channels=self.widths[0], out_channels=out_channels, kernel_size=1)
+        self.final_conv = nn.Conv3d(
+            in_channels=self.widths[0],
+            out_channels=out_channels,
+            kernel_size=1,
+        )
         if self.head:
             # self.final_act = nn.Softmax(dim=1)
             self.final_act = nn.Sigmoid()
@@ -130,7 +199,9 @@ class UNet(nn.Module):
         dec_1 = self.dec_1(cat_1)  # dec_1 has widths[3] (256)
 
         up_2 = self.up_2(dec_1)
-        cat_2 = cat([up_2, enc_4], dim=1)  # up_2 has widths[3] (256) + enc_5 has widths[4] (320) = 640
+        cat_2 = cat(
+            [up_2, enc_4], dim=1
+        )  # up_2 has widths[3] (256) + enc_5 has widths[4] (320) = 640
         dec_2 = self.dec_2(cat_2)
 
         up_3 = self.up_3(dec_2)
@@ -170,12 +241,13 @@ if __name__ == '__main__':
 
     # Initialize model
     base_model = UNet(in_channels=4, out_channels=3, head=False)
-    res_model = UNet(in_channels=4, out_channels=3, head=False,
-                     core_block=ResBlock,
-                     core_block_conv_params={
-                         'kernel_size': 5,
-                         'padding': 2
-                     })
+    res_model = UNet(
+        in_channels=4,
+        out_channels=3,
+        head=False,
+        core_block=ResBlock,
+        core_block_conv_params={'kernel_size': 5, 'padding': 2},
+    )
 
     # Process example input
     out_base = base_model(x)

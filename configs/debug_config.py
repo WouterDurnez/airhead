@@ -48,7 +48,7 @@ GENERAL = {
         'test_inference_params': {'overlap': 0.5},
     },
     'data': {
-        'root_dir': '../../data/Task01_BrainTumour',
+        'root_dir': '../data/Task01_BrainTumour',
         'spatial_size': (128, 128, 128),
         'num_splits': 5,
         # "split": 0,
@@ -89,7 +89,7 @@ AIR_MODEL = {
     'network': AirUNet,
     'network_params': {
         'core_block': AirResBlock,
-        'core_block_conv_params': {'comp_friendly': True},
+        'core_block_conv_params': {'comp_friendly': True, 'quiet': False},
         'in_channels': 4,
         'out_channels': 3,
         # "widths": (32, 64, 128, 256, 512),

@@ -25,7 +25,15 @@ from src.models.base_unet import UNet
 from src.training.data_module import BraTSDataModule
 from src.training.lightning import UNetLightning
 from src.training.losses import *
-from src.training.metrics import dice_metric, dice_et, dice_tc, dice_wt, hd_et, hd_tc, hd_wt
+from src.training.metrics import (
+    dice_metric,
+    dice_et,
+    dice_tc,
+    dice_wt,
+    hd_et,
+    hd_tc,
+    hd_wt,
+)
 
 
 ####################################################
@@ -49,7 +57,7 @@ def val_inference(input: torch.Tensor, model: nn.Module):
     # * Sigmoid activation layer (if needed)
     # * Threshold the values to 0 or 1
 
-    post_trans_list = [AsDiscrete(threshold=.5)]
+    post_trans_list = [AsDiscrete(threshold=0.5)]
 
     # If it's the right type of model, containing our 'head' parameter,
     # check if the head is there, otherwise add sigmoid as posttransform
@@ -64,7 +72,9 @@ def val_inference(input: torch.Tensor, model: nn.Module):
     return output
 
 
-def test_inference(input: torch.Tensor, model: nn.Module, roi_dim: int = 128, **kwargs):
+def test_inference(
+    input: torch.Tensor, model: nn.Module, roi_dim: int = 128, **kwargs
+):
     """
     Inference function for test data, using sliding window
 
@@ -75,8 +85,11 @@ def test_inference(input: torch.Tensor, model: nn.Module, roi_dim: int = 128, **
 
     # Generate output using sliding window (sized 128^3)
     output = sliding_window_inference(
-        inputs=input, roi_size=(roi_dim, roi_dim, roi_dim),
-        sw_batch_size=1, predictor=model, **kwargs
+        inputs=input,
+        roi_size=(roi_dim, roi_dim, roi_dim),
+        sw_batch_size=1,
+        predictor=model,
+        **kwargs,
     )
 
     # Post transforms
@@ -102,7 +115,14 @@ def test_inference(input: torch.Tensor, model: nn.Module, roi_dim: int = 128, **
 # Prediction #
 ##############
 
-def predict(model: torch.nn.Module, sample: dict, device: torch.device, model_name: str, write_dir: str = None):
+
+def predict(
+    model: torch.nn.Module,
+    sample: dict,
+    device: torch.device,
+    model_name: str,
+    write_dir: str = None,
+):
     if write_dir is None:
         write_dir = join(hlp.LOG_DIR, 'images', model_name)
         hlp.set_dir(write_dir)
@@ -126,10 +146,9 @@ if __name__ == '__main__':
     # Set parameters
     fold_index = 0
     models = [('baseline', 0)]
-    models += list(product(
-        ('cpd', 'tt', 'tucker'),
-        (2, 5, 10, 20, 35, 50, 75, 100)
-    ))
+    models += list(
+        product(('cpd', 'tt', 'tucker'), (2, 5, 10, 20, 35, 50, 75, 100))
+    )
 
     for type, version in tqdm(models, desc='Predicting segmentation'):
         model_name = f'unet_{type}_f{fold_index}'
@@ -139,60 +158,77 @@ if __name__ == '__main__':
 
         # Load model
         model = UNetLightning(
-
             # Architecture settings
             network=UNet,
             network_params={
                 'in_channels': 4,
                 'out_channels': 3,
                 'widths': (32, 64, 128, 256, 320),
-                'head': False},
-
+                'head': False,
+            },
             # Loss and metrics
             loss=dice_loss,
-            metrics=[dice_metric, dice_et, dice_tc, dice_wt,
-                     hd_et, hd_tc, hd_wt],
-
+            metrics=[
+                dice_metric,
+                dice_et,
+                dice_tc,
+                dice_wt,
+                hd_et,
+                hd_tc,
+                hd_wt,
+            ],
             # Optimizer
             optimizer=optim.AdamW,
             optimizer_params={'lr': 1e-4, 'weight_decay': 1e-5},
-
             # Learning rate scheduler
             scheduler=CosineAnnealingWarmRestarts,
             scheduler_config={'interval': 'epoch'},
             scheduler_params={'T_0': 50, 'eta_min': 3e-5},
-
             # Inference method
             inference=val_inference,
             inference_params=None,
-
             # Test inference method
             test_inference=test_inference,
-            test_inference_params={'overlap': .5},
+            test_inference_params={'overlap': 0.5},
         )
 
         # Load from checkpoint
-        checkpoint_path = join(hlp.LOG_DIR, 'snapshots', model_name,
-                               f'final_{model_name}_v{version}_fold{fold_index}.ckpt')
+        checkpoint_path = join(
+            hlp.LOG_DIR,
+            'snapshots',
+            model_name,
+            f'final_{model_name}_v{version}_fold{fold_index}.ckpt',
+        )
 
         model = model.load_from_checkpoint(checkpoint_path=checkpoint_path)
         model = model.to(device)
 
         # Predict a sample
-        brats = BraTSDataModule(data_dir=join(hlp.DATA_DIR, "MICCAI_BraTS2020_TrainingData"), num_workers=2)
+        brats = BraTSDataModule(
+            data_dir=join(hlp.DATA_DIR, 'MICCAI_BraTS2020_TrainingData'),
+            num_workers=2,
+        )
         brats.setup('test')
 
         # Predict all samples
-        '''for index, sample in tqdm(enumerate(brats.test_set), f"Predicting samples using {model_name} model"):
+        """for index, sample in tqdm(enumerate(brats.test_set), f"Predicting samples using {model_name} model"):
             print(index, sample['id'])
             if sample['id'] != 'BraTS20_Training_102':
                 print('skip')
-                continue'''
+                continue"""
 
         sample = brats.test_set[16]
 
         with torch.no_grad():
-            test = predict(model=model, sample=sample, model_name=model_name, device=device,
-                           write_dir=write_dir).detach()
+            test = predict(
+                model=model,
+                sample=sample,
+                model_name=model_name,
+                device=device,
+                write_dir=write_dir,
+            ).detach()
         test = sitk.GetImageFromArray(test.cpu().numpy())
-        sitk.WriteImage(image=test, fileName=join(write_dir, f'{model_name}_v{version}_2.nii.gz'))
+        sitk.WriteImage(
+            image=test,
+            fileName=join(write_dir, f'{model_name}_v{version}_2.nii.gz'),
+        )

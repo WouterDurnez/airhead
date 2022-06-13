@@ -325,10 +325,14 @@ if __name__ == '__main__':
                 measure, fontdict={'weight': 'bold'}
             )
             ax[row_idx, col_idx].set_xscale('log')
-            ax[row_idx, col_idx].set_xticks([2**i for i in range(1,9)])
-            ax[row_idx, col_idx].get_xaxis().set_major_formatter(mticker.ScalarFormatter())
-            ax[row_idx, col_idx].get_xaxis().set_tick_params(which='minor', size=0,width=0)
-            #ax[row_idx, col_idx].get_xaxis().set_tick_params(which='minor', width=0)
+            ax[row_idx, col_idx].set_xticks([2**i for i in range(1, 9)])
+            ax[row_idx, col_idx].get_xaxis().set_major_formatter(
+                mticker.ScalarFormatter()
+            )
+            ax[row_idx, col_idx].get_xaxis().set_tick_params(
+                which='minor', size=0, width=0
+            )
+            # ax[row_idx, col_idx].get_xaxis().set_tick_params(which='minor', width=0)
             if row_idx < 2:
                 ax[row_idx, col_idx].set_xlabel('')
             else:
@@ -365,3 +369,9 @@ if __name__ == '__main__':
         )"""
 
         plt.show()
+
+    summary = (
+        metrics.query("type == 'base'")
+        .groupby(['type', 'comp', 'widths'])
+        .agg(['mean', 'std'])
+    )

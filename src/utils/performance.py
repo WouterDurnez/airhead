@@ -71,7 +71,7 @@ def generate_test_params(base_only=False) -> list:
         return test_params
 
     # TENSORIZED
-    compression_rates = (2,4,8,16,32,64,128,256)
+    compression_rates = (2, 4, 8, 16, 32, 64, 128, 256)
     tensor_net_types = ('tucker', 'tt', 'cp')
     for c, t in product(compression_rates, tensor_net_types):
         test_params.append(
