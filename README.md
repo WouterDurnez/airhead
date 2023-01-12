@@ -9,6 +9,7 @@ Promotor: [prof. dr. ir. Sabine Van huffel](https://www.esat.kuleuven.be/stadius
 Copromotor: [prof. dr. ir. Frederik Maes](https://www.kuleuven.be/wieiswie/nl/person/00007203)
 
 Supervisor: [Pooya Ashtari](https://www.kuleuven.be/wieiswie/nl/person/00129604).
+[Check out his GitHub! 🙂] (https://github.com/pashtari)
 
 ### Components
 
